@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c2117">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="야구 점수판">
+<title>야구 점수판</title>
+<style>
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); box-sizing: border-box; }
+body { margin: 0; }
+[hidden] { display: none !important; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Chakra+Petch:wght@500;700&family=IBM+Plex+Sans+KR:wght@400;600&display=swap">
+<style>
+/* Layout: ballpark scoreboard in one committed dark-green look. Phone: score → count/diamond → controls → line score.
+   Wide/landscape: two columns (score + line score | count + controls). B/S/O lamps use the stadium convention green/yellow/red. */
+:root {
+  color-scheme: dark;
+  --bg: #0c2117;
+  --board: #123020;
+  --board-2: #0f281b;
+  --line: #24503a;
+  --fg: #f3efe2;
+  --muted: #9db8a6;
+  --amber: #ffc93c;
+  --lamp-b: #3ddc84;
+  --lamp-s: #ffc93c;
+  --lamp-o: #ff5148;
+  --lamp-off: #1b3c2b;
+  --f-display: "Black Han Sans", "IBM Plex Sans KR", system-ui, sans-serif;
+  --f-num: "Chakra Petch", ui-monospace, "SF Mono", monospace;
+  --f-ui: "IBM Plex Sans KR", system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
+  --gutter: clamp(16px, 2vw, 28px);
+  --r: 14px;
+}
+html, body { min-height: 100%; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--f-ui); font-size: 15px;
+  padding-inline: var(--gutter); padding-block: 12px;
+  box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 12px;
+  -webkit-tap-highlight-color: transparent; user-select: none;
+}
+*, *::before, *::after { box-sizing: inherit; }
+button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+button:disabled { opacity: .35; cursor: not-allowed; }
+
+/* Top bar */
+.bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.brand { font-family: var(--f-display); font-size: 1.15rem; margin-right: auto; }
+.inning {
+  display: flex; align-items: center; gap: 8px; padding: 4px 16px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--board);
+  font-family: var(--f-display); font-size: 1.25rem; color: var(--amber);
+}
+.inning .arrow { font-size: .8rem; }
+.tools { display: flex; gap: 6px; flex-wrap: wrap; }
+.tbtn {
+  background: var(--board); border: 1px solid var(--line); border-radius: 10px;
+  padding: 8px 12px; font-size: .9rem; font-weight: 600; min-height: 40px;
+}
+.tbtn:hover:not(:disabled) { border-color: var(--muted); }
+.tbtn.off { color: var(--muted); text-decoration: line-through; }
+.tbtn kbd { font-family: var(--f-num); font-size: .7rem; color: var(--muted); margin-left: 4px; }
+.status { font-size: .88rem; color: var(--muted); min-height: 1.3em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.status b { color: var(--fg); font-weight: 600; }
+
+/* Main grid */
+.layout { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "score" "count" "ctrls" "line"; }
+@media (min-width: 900px), (orientation: landscape) and (min-width: 640px) {
+  .layout { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); grid-template-areas: "score count" "line ctrls"; align-items: start; }
+}
+.panel { background: var(--board); border: 1px solid var(--line); border-radius: var(--r); padding: 12px; min-width: 0; }
+
+/* Team scores */
+.scores { grid-area: score; display: grid; gap: 8px; }
+.trow {
+  --c: #888; display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 14px; align-items: center;
+  padding: 8px 14px 8px 8px; border-radius: 12px; background: var(--board-2); border: 2px solid transparent;
+}
+.trow .stripe { align-self: stretch; border-radius: 6px; background: var(--c); }
+.trow .who { min-width: 0; display: grid; gap: 4px; }
+.trow .name { font-family: var(--f-display); font-size: clamp(1.3rem, 4.5vw, 2.4rem); line-height: 1.05; overflow-wrap: anywhere; }
+.trow .meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: .8rem; color: var(--muted); }
+.trow .atbat { display: none; background: var(--amber); color: #1d1600; font-weight: 600; font-size: .72rem; padding: 2px 8px; border-radius: 999px; letter-spacing: .04em; }
+.trow.batting { border-color: var(--amber); }
+.trow.batting .atbat { display: inline-block; }
+.trow .runs { font-family: var(--f-num); font-weight: 700; font-variant-numeric: tabular-nums; font-size: clamp(3.4rem, 13vw, 7.5rem); line-height: .9; min-width: 1.2ch; text-align: right; }
+.runs.bump { animation: bump .3s ease-out; }
+@keyframes bump { 0% { transform: scale(1.12); color: var(--amber); } 100% { transform: scale(1); } }
+
+/* Count + diamond */
+.countbox { grid-area: count; display: flex; flex-wrap: wrap; gap: 18px; align-items: center; justify-content: space-around; }
+.lamps { display: grid; gap: 10px; }
+.lrow { display: grid; grid-template-columns: 1.6em auto; align-items: center; gap: 10px; }
+.lrow .k { font-family: var(--f-num); font-weight: 700; font-size: clamp(1.3rem, 4vw, 1.9rem); color: var(--muted); }
+.dots { display: flex; gap: 8px; }
+.dot {
+  --on: var(--lamp-b);
+  width: clamp(30px, 7vw, 44px); aspect-ratio: 1; border-radius: 50%; padding: 0;
+  background: var(--lamp-off); border: 2px solid #0a1d13; box-shadow: inset 0 2px 6px rgb(0 0 0 / .45);
+  transition: background .12s, box-shadow .12s;
+}
+.dot.on { background: var(--on); box-shadow: 0 0 14px color-mix(in srgb, var(--on) 70%, transparent), inset 0 -3px 6px rgb(0 0 0 / .25); }
+.lrow[data-k="strikes"] .dot { --on: var(--lamp-s); }
+.lrow[data-k="outs"] .dot { --on: var(--lamp-o); }
+
+.diamond { position: relative; width: clamp(180px, 50vw, 270px); aspect-ratio: 1; max-width: 100%; }
+@media (min-width: 900px), (orientation: landscape) and (min-width: 640px) { .diamond { width: clamp(180px, 22vw, 270px); } }
+.base::after { content: attr(data-label); position: absolute; inset: 0; display: grid; place-items: center; transform: rotate(-45deg); font-family: var(--f-num); font-weight: 700; font-size: clamp(.8rem, 2.4vw, 1.05rem); color: var(--muted); }
+.base[aria-pressed="true"]::after { color: #1d1600; }
+.diamond::before {
+  content: ""; position: absolute; left: 21%; top: 21%; width: 58%; height: 58%;
+  transform: rotate(45deg); border: 2px dashed color-mix(in srgb, var(--fg) 25%, transparent); border-radius: 4px;
+}
+.base {
+  position: absolute; width: 26%; aspect-ratio: 1; padding: 0;
+  transform: rotate(45deg); border-radius: 4px;
+  background: var(--board-2); border: 3px solid color-mix(in srgb, var(--fg) 55%, transparent);
+}
+.base[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); box-shadow: 0 0 16px color-mix(in srgb, var(--amber) 60%, transparent); }
+.base[data-b="1"] { left: 37%; top: 4%; }
+.base[data-b="0"] { left: 70%; top: 37%; }
+.base[data-b="2"] { left: 4%; top: 37%; }
+.home {
+  position: absolute; left: 41%; top: 74%; width: 18%; aspect-ratio: 1;
+  background: color-mix(in srgb, var(--fg) 75%, transparent);
+  clip-path: polygon(0 0, 100% 0, 100% 55%, 50% 100%, 0 55%);
+}
+.dhint { width: 100%; text-align: center; font-size: .75rem; color: var(--muted); margin: -8px 0 0; }
+
+/* Controls */
+.ctrls { grid-area: ctrls; display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.act {
+  --k: var(--muted);
+  min-height: clamp(62px, 10vh, 92px); border-radius: 12px;
+  border: 2px solid var(--k); background: color-mix(in srgb, var(--k) 16%, var(--board-2));
+  font-family: var(--f-display); font-size: clamp(1.1rem, 3.6vw, 1.6rem); line-height: 1.1;
+  display: grid; place-content: center; gap: 2px; text-align: center;
+}
+.act small { font-family: var(--f-num); font-size: .68rem; color: var(--muted); }
+.act:active:not(:disabled) { background: color-mix(in srgb, var(--k) 35%, var(--board-2)); }
+.act.ball { --k: var(--lamp-b); }
+.act.strike { --k: var(--lamp-s); }
+.act.out { --k: var(--lamp-o); }
+.act.run { --k: var(--amber); background: var(--amber); color: #1d1600; }
+.act.run small { color: #5a4600; }
+.act.minor { min-height: 46px; font-family: var(--f-ui); font-weight: 600; font-size: .92rem; }
+@media (hover: none) { .act small, .tbtn kbd, .hint { display: none; } }
+
+/* Line score */
+.linewrap { grid-area: line; overflow-x: auto; padding: 0; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { padding: 10px 8px; text-align: center; font-family: var(--f-num); font-weight: 700; font-size: 1.05rem; border-bottom: 1px solid var(--line); white-space: nowrap; }
+thead th { font-size: .78rem; color: var(--muted); font-weight: 500; letter-spacing: .06em; }
+tbody tr:last-child td, tbody tr:last-child th { border-bottom: 0; }
+th.tn { text-align: left; font-family: var(--f-ui); font-weight: 600; font-size: .92rem; padding-left: 14px; position: sticky; left: 0; background: var(--board); max-width: 9em; overflow: hidden; text-overflow: ellipsis; }
+th.tn i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: 0; }
+td.cur { background: color-mix(in srgb, var(--amber) 22%, transparent); color: var(--amber); }
+td.tot { color: var(--amber); border-left: 1px solid var(--line); }
+td.tot + td { color: var(--muted); }
+thead th.ccol { color: var(--amber); }
+
+.hint { font-size: .8rem; color: var(--muted); }
+
+/* Overlays */
+.sheet-wrap { position: fixed; inset: 0; background: rgb(0 0 0 / .62); display: grid; place-items: center; padding: 16px; z-index: 10; }
+.sheet { width: min(460px, 100%); background: var(--board); border: 1px solid var(--line); border-radius: 16px; padding: 20px; display: grid; gap: 14px; max-height: 100%; overflow: auto; }
+.sheet h2 { margin: 0; font-family: var(--f-display); font-weight: 400; font-size: 1.4rem; }
+.final { text-align: center; border-color: var(--amber); border-width: 2px; }
+.final .eyebrow { font-family: var(--f-num); color: var(--amber); letter-spacing: .16em; font-size: .8rem; }
+.final .big { font-family: var(--f-num); font-weight: 700; font-size: clamp(3rem, 14vw, 5rem); line-height: 1; }
+.final .row { justify-content: center; }
+.field { display: grid; gap: 6px; }
+.field > label { font-size: .8rem; color: var(--muted); letter-spacing: .04em; }
+.field input[type=number], .teamset input:not([type=color]) { font: inherit; font-size: 1rem; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%; }
+.note { font-size: .8rem; color: var(--muted); margin: 0; line-height: 1.5; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; }
+.primary { background: var(--amber); color: #1d1600; border: 0; border-radius: 10px; padding: 12px 18px; font-weight: 700; min-height: 46px; }
+.danger { background: transparent; border: 1px solid #e05656; color: #ff9b9b; border-radius: 10px; padding: 10px 14px; font-weight: 600; }
+.danger.armed { background: #e05656; color: #fff; }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.presets button { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; min-width: 52px; min-height: 42px; font-family: var(--f-num); font-weight: 700; font-size: 1.05rem; }
+.presets.ko button { font-family: var(--f-ui); font-size: .88rem; font-weight: 600; padding: 0 12px; }
+.presets button[aria-pressed="true"] { background: var(--amber); color: #1d1600; border-color: var(--amber); }
+.stepper { display: flex; gap: 6px; }
+.stepper button { width: 46px; flex: none; }
+.stepper input { text-align: center; font-family: var(--f-num); font-weight: 700; font-size: 1.2rem; }
+.soundrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.soundrow input[type=range] { flex: 1; min-width: 120px; accent-color: var(--amber); }
+.teamset { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+.teamset-top { display: flex; gap: 10px; align-items: center; }
+.teamset-top .pv { flex: none; width: 40px; height: 40px; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--line); }
+.teamset-top .lbl { flex: none; font-size: .78rem; color: var(--muted); width: 2.6em; }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sw { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .18); padding: 0; }
+.sw[aria-pressed="true"] { border-color: var(--amber); outline: 2px solid var(--bg); outline-offset: -4px; }
+.custom { position: relative; width: 30px; height: 30px; border-radius: 50%; overflow: hidden; border: 1px dashed var(--muted); display: grid; place-items: center; color: var(--muted); }
+.custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; padding: 0; border: 0; }
+
+@media (prefers-reduced-motion: reduce) { .runs.bump { animation: none; } * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="brand">야구 점수판</div>
+  <div class="inning" aria-live="polite"><span class="arrow" id="arrow">▲</span><span id="inningLabel">1회 초</span></div>
+  <div class="tools">
+    <button class="tbtn" id="soundBtn" type="button">소리<kbd>M</kbd></button>
+    <button class="tbtn" id="undoBtn" type="button">되돌리기<kbd>Z</kbd></button>
+    <button class="tbtn" id="setBtn" type="button">설정</button>
+    <button class="tbtn" id="fsBtn" type="button">전체화면</button>
+  </div>
+</header>
+<div class="status" id="status" aria-live="polite"></div>
+
+<main class="layout">
+  <section class="scores" aria-label="팀 점수">
+    <div class="trow" id="row0"><span class="stripe"></span><div class="who"><span class="name"></span><span class="meta"><span class="atbat">공격</span><span class="side">원정 · 초 공격</span></span></div><span class="runs">0</span></div>
+    <div class="trow" id="row1"><span class="stripe"></span><div class="who"><span class="name"></span><span class="meta"><span class="atbat">공격</span><span class="side">홈 · 말 공격</span></span></div><span class="runs">0</span></div>
+  </section>
+
+  <section class="panel countbox" aria-label="카운트와 주자">
+    <div class="lamps">
+      <div class="lrow" data-k="strikes"><span class="k">S</span><div class="dots"></div></div>
+      <div class="lrow" data-k="outs"><span class="k">O</span><div class="dots"></div></div>
+    </div>
+    <div class="diamond">
+      <button class="base" type="button" data-b="1" data-label="2" aria-label="2루 주자"></button>
+      <button class="base" type="button" data-b="2" data-label="3" aria-label="3루 주자"></button>
+      <button class="base" type="button" data-b="0" data-label="1" aria-label="1루 주자"></button>
+      <span class="home"></span>
+    </div>
+    <p class="dhint">베이스를 눌러 주자를 표시하거나 지우세요</p>
+  </section>
+
+  <section class="ctrls" aria-label="기록 버튼">
+    <button class="act strike" type="button" data-a="strike">스트라이크<small>S</small></button>
+    <button class="act out" type="button" data-a="out">아웃<small>O</small></button>
+    <button class="act run" type="button" data-a="run">득점 +1<small>R</small></button>
+    <button class="act minor" type="button" data-a="runMinus">득점 −1</button>
+    <button class="act minor" type="button" data-a="change">공수 교대</button>
+    <button class="act minor" type="button" data-a="clearCount">다음 타자</button>
+  </section>
+
+  <section class="panel linewrap" aria-label="이닝별 점수">
+    <table id="lineTable"></table>
+  </section>
+</main>
+
+<footer class="hint">키보드: S 스트라이크 · O 아웃 · R 득점 · 1·2·3 주자 · Z 되돌리기 · M 소리</footer>
+
+<div class="sheet-wrap" id="finalWrap" hidden>
+  <div class="sheet final">
+    <span class="eyebrow">GAME SET</span>
+    <h2 id="finalWinner"></h2>
+    <div class="big" id="finalScore"></div>
+    <p class="note" id="finalNote"></p>
+    <div class="row">
+      <button class="tbtn" id="finalUndo" type="button">되돌리기</button>
+      <button class="tbtn" id="finalClose" type="button">점수판 보기</button>
+      <button class="primary" id="finalNew" type="button">새 경기</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-wrap" id="sheet" hidden>
+  <form class="sheet" id="setForm">
+    <h2>경기 설정</h2>
+    <div class="field">
+      <label for="innings">정규 이닝 수</label>
+      <div class="presets" id="innPresets"></div>
+      <div class="stepper">
+        <button class="tbtn" type="button" id="iMinus" aria-label="이닝 1 줄이기">−</button>
+        <input id="innings" type="number" min="1" max="15" inputmode="numeric">
+        <button class="tbtn" type="button" id="iPlus" aria-label="이닝 1 늘리기">+</button>
+      </div>
+      <p class="note">정규 이닝이 끝났을 때 동점이면 연장으로 이어집니다. 마지막 이닝 말에 홈팀이 앞서는 순간 경기가 끝납니다.</p>
+    </div>
+    <div class="field">
+      <label>팀 이름과 색상</label>
+      <div class="teamset" id="ts0"></div>
+      <div class="teamset" id="ts1"></div>
+    </div>
+    <div class="field">
+      <label>소리</label>
+      <div class="soundrow">
+        <button class="tbtn" type="button" id="sndToggle">켜짐</button>
+        <input type="range" id="vol" min="0" max="100" step="5" aria-label="음량">
+      </div>
+      <label>득점 소리 · 눌러서 미리 듣기</label>
+      <div class="presets ko" id="runSnd"></div>
+    </div>
+    <div class="row">
+      <button class="danger" id="resetBtn" type="button">새 경기 시작</button>
+      <div class="tools">
+        <button class="tbtn" id="closeBtn" type="button">닫기</button>
+        <button class="primary" type="submit">저장</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+(() => {
+  const KEY = 'baseball-scoreboard-v1', PKEY = 'baseball-sound-v1';
+  const PALETTE = [
+    ['파랑', '#2f6fe4'], ['빨강', '#e23b3b'], ['남색', '#1e3a8a'], ['초록', '#22a45d'],
+    ['노랑', '#ffd23f'], ['주황', '#ff8a2a'], ['보라', '#8b5cf6'], ['하늘', '#38bdf8'],
+    ['핑크', '#ff3f8e'], ['검정', '#08080a'], ['회색', '#a3a9b4'], ['흰색', '#f4f4f2']
+  ];
+  const INNING_PRESETS = [3, 5, 6, 7, 9];
+  const fresh = (names, colors, innings) => ({
+    names: names || ['원정', '홈'], colors: colors || ['#2f6fe4', '#e23b3b'], innings: innings || 9,
+    inning: 1, half: 0, balls: 0, strikes: 0, outs: 0, bases: [false, false, false],
+    line: [[0], []], hits: [0, 0], over: false, xBottom: false, last: ''
+  });
+  let s;
+  try { s = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+  if (!s || !Array.isArray(s.line)) s = fresh();
+  const undoStack = [];
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} };
+  const $ = id => document.getElementById(id);
+  const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const total = t => s.line[t].reduce((a, b) => a + (b || 0), 0);
+  const inningLabel = () => `${s.inning}회 ${s.half ? '말' : '초'}`;
+
+  // ---------- Sound (synthesized, no files) ----------
+  let prefs = { on: true, vol: 70, run: 'random' };
+  try { Object.assign(prefs, JSON.parse(localStorage.getItem(PKEY)) || {}); } catch (e) {}
+  const savePrefs = () => { try { localStorage.setItem(PKEY, JSON.stringify(prefs)); } catch (e) {} };
+  let ctx = null, lastRun = '', noiseBuf = null;
+  function ac() {
+    try { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); if (ctx.state === 'suspended') ctx.resume(); }
+    catch (e) { ctx = null; }
+    return ctx;
+  }
+  function out(c) { const g = c.createGain(); g.gain.value = (prefs.vol / 100) * .8; g.connect(c.destination); return g; }
+  function tone(c, dst, f, at, dur, type = 'sine', vol = .4, f2 = null, filter = null) {
+    const t = c.currentTime + at, o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t);
+    if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + .012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    let node = o;
+    if (filter) { const fl = c.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = filter; o.connect(fl); node = fl; }
+    node.connect(g); g.connect(dst); o.start(t); o.stop(t + dur + .05);
+    return o;
+  }
+  function noise(c, dst, at, dur, vol = .4, freq = 1500, q = 1, type = 'bandpass', attack = .005) {
+    if (!noiseBuf) {
+      noiseBuf = c.createBuffer(1, c.sampleRate * 3, c.sampleRate);
+      const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const t = c.currentTime + at, src = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain();
+    src.buffer = noiseBuf; fl.type = type; fl.frequency.value = freq; fl.Q.value = q;
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + attack); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(fl); fl.connect(g); g.connect(dst); src.start(t, Math.random() * .3); src.stop(t + dur + .05);
+  }
+  function organ(c, d, f, at, dur, vol = 1) {
+    tone(c, d, f, at, dur, 'sine', .26 * vol); tone(c, d, f * 2, at, dur, 'sine', .12 * vol); tone(c, d, f, at, dur, 'square', .05 * vol, null, 1800);
+  }
+  function crowd(c, d, at, dur, vol = 1) {
+    noise(c, d, at, dur, .32 * vol, 900, .6, 'bandpass', .3);
+    noise(c, d, at + .1, dur - .2, .18 * vol, 2200, .8, 'bandpass', .35);
+    for (let k = 0; k < 12; k++) { const a = at + .1 + Math.random() * (dur - .6); [0, .012].forEach(x => noise(c, d, a + x, .08, .22 * vol, 1200 + Math.random() * 800, .9)); }
+  }
+  const SFX = {
+    tick: (c, d) => tone(c, d, 220, 0, .1, 'triangle', .3),
+    ball: (c, d) => tone(c, d, 620, 0, .14, 'triangle', .32),
+    strike: (c, d) => { noise(c, d, 0, .1, .8, 600, .7, 'lowpass', .002); tone(c, d, 150, 0, .14, 'sine', .7, 55); },
+    foul: (c, d) => { noise(c, d, 0, .05, .7, 3200, 1.2, 'bandpass', .001); tone(c, d, 1300, 0, .06, 'triangle', .18); },
+    out: (c, d) => { tone(c, d, 392, 0, .2, 'triangle', .38); tone(c, d, 294, .17, .32, 'triangle', .36); },
+    strikeout: (c, d) => { SFX.strike(c, d); [523, 392, 262].forEach((f, k) => tone(c, d, f, .18 + k * .14, .2, 'square', .1, null, 1600)); },
+    hit: (c, d) => { noise(c, d, 0, .05, 1, 2800, .7, 'bandpass', .001); tone(c, d, 1700, 0, .06, 'square', .16, 600); noise(c, d, .05, .5, .2, 800, .5, 'lowpass', .1); },
+    walk: (c, d) => { tone(c, d, 523, 0, .14, 'triangle', .32); tone(c, d, 659, .13, .24, 'triangle', .32); },
+    change: (c, d) => { [523, 659, 784].forEach((f, k) => organ(c, d, f, k * .12, .16)); organ(c, d, 1047, .36, .5); },
+    win: (c, d) => {
+      [[392, 0], [523, .13], [659, .26]].forEach(([f, a]) => tone(c, d, f, a, .14, 'sawtooth', .22, null, 2400));
+      tone(c, d, 784, .39, .45, 'sawtooth', .24, null, 2400);
+      [[659, .9], [784, 1.05]].forEach(([f, a]) => tone(c, d, f, a, .14, 'sawtooth', .22, null, 2400));
+      [523, 659, 784, 1047].forEach(f => tone(c, d, f, 1.2, 1.5, 'sawtooth', .12, null, 2000));
+      crowd(c, d, 1.1, 2.4, .9);
+    }
+  };
+  const RUN_SOUNDS = {
+    charge: ['차지 오르간', (c, d) => { [[392, 0], [523, .15], [659, .3], [784, .45], [659, .75], [784, .9]].forEach(([f, a], k) => organ(c, d, f, a, k === 5 ? .6 : .14)); }],
+    cheer: ['관중 환호', (c, d) => { crowd(c, d, 0, 1.8); }],
+    homerun: ['딱! 와아', (c, d) => { SFX.hit(c, d); crowd(c, d, .25, 1.8); }],
+    chime: ['딩동', (c, d) => { tone(c, d, 880, 0, .4, 'sine', .45); tone(c, d, 1318.5, .13, .6, 'sine', .4); }],
+    arcade: ['아케이드', (c, d) => { [523, 659, 784, 1047, 1319].forEach((f, k) => tone(c, d, f, k * .055, .14, 'triangle', .35)); }],
+    drum: ['응원 북', (c, d) => { [0, .2, .4, .5, .6].forEach(a => { tone(c, d, 150, a, .3, 'sine', .9, 45); noise(c, d, a, .05, .2, 2500, .7); }); }],
+    clap: ['박수', (c, d) => { [0, .18, .36, .5].forEach(a => [0, .012, .024].forEach(x => noise(c, d, a + x, .12, .5, 1300, .8))); }]
+  };
+  function play(key, force) {
+    if ((!prefs.on && !force) || !key) return;
+    const c = ac(); if (!c) return;
+    try {
+      if (key === 'run') {
+        let k = prefs.run;
+        if (k === 'random' || !RUN_SOUNDS[k]) { const ks = Object.keys(RUN_SOUNDS).filter(x => x !== lastRun); k = ks[Math.floor(Math.random() * ks.length)]; }
+        lastRun = k; RUN_SOUNDS[k][1](c, out(c));
+      } else if (RUN_SOUNDS[key]) RUN_SOUNDS[key][1](c, out(c));
+      else SFX[key](c, out(c));
+    } catch (e) {}
+  }
+
+  // ---------- Game logic ----------
+  const resetCount = () => { s.balls = 0; s.strikes = 0; };
+  function addRun(n) {
+    const t = s.half, i = s.inning - 1;
+    s.line[t][i] = Math.max(0, (s.line[t][i] || 0) + n);
+    if (n > 0 && s.half === 1 && s.inning >= s.innings && total(1) > total(0)) s.over = true;
+  }
+  function forceAdvance() {
+    const b = s.bases;
+    if (!b[0]) b[0] = true; else if (!b[1]) b[1] = true; else if (!b[2]) b[2] = true; else { addRun(1); return true; }
+    return false;
+  }
+  function endHalf() {
+    s.outs = 0; resetCount(); s.bases = [false, false, false];
+    const a = total(0), h = total(1);
+    if (s.half === 0 && s.inning >= s.innings && h > a) { s.over = true; s.xBottom = true; return; }
+    if (s.half === 1 && s.inning >= s.innings && h !== a) { s.over = true; return; }
+    if (s.half === 0) { s.half = 1; s.line[1][s.inning - 1] = s.line[1][s.inning - 1] || 0; }
+    else { s.half = 0; s.inning++; s.line[0][s.inning - 1] = s.line[0][s.inning - 1] || 0; }
+  }
+  function doOut(prefix) {
+    s.outs++; resetCount();
+    if (s.outs >= 3) {
+      endHalf();
+      s.last = s.over ? `<b>${prefix} · 3아웃</b> · 경기 종료` : `<b>${prefix} · 3아웃 공수 교대</b> → ${inningLabel()}`;
+      return s.over ? 'win' : 'change';
+    }
+    s.last = `<b>${prefix}</b> · ${s.outs}아웃`;
+    return prefix === '삼진 아웃' ? 'strikeout' : 'out';
+  }
+  const ACTIONS = {
+    strike() {
+      s.strikes++;
+      if (s.strikes >= 3) return doOut('삼진 아웃');
+      s.last = `<b>스트라이크</b> · ${s.strikes}스트라이크`; return 'strike';
+    },
+    out() { return doOut('아웃'); },
+    run() {
+      addRun(1);
+      s.last = `<b>${esc(s.names[s.half])} 득점</b> · ${total(0)} : ${total(1)}`;
+      return s.over ? 'win' : 'run';
+    },
+    runMinus() {
+      const i = s.inning - 1;
+      if (!(s.line[s.half][i] > 0)) return null;
+      addRun(-1); s.last = `<b>득점 취소</b> · ${total(0)} : ${total(1)}`; return 'tick';
+    },
+    change() {
+      endHalf();
+      s.last = s.over ? '<b>공수 교대</b> · 경기 종료' : `<b>공수 교대</b> → ${inningLabel()}`;
+      return s.over ? 'win' : 'change';
+    },
+    clearCount() { resetCount(); s.last = '<b>다음 타자</b> · 스트라이크 초기화'; return 'tick'; }
+  };
+
+  let prevTotals = [total(0), total(1)];
+  function commit(fn) {
+    const snap = JSON.stringify(s);
+    const snd = fn();
+    if (snd === null) return;
+    undoStack.push(snap); if (undoStack.length > 300) undoStack.shift();
+    save(); render(); play(snd);
+  }
+  function act(name) {
+    if (s.over && name !== 'runMinus') return;
+    commit(ACTIONS[name]);
+  }
+  function undo() {
+    if (!undoStack.length) return;
+    s = JSON.parse(undoStack.pop());
+    s.last = '<b>되돌림</b> · ' + (s.last || '경기 시작 상태');
+    save(); render(); play('tick');
+  }
+
+  // ---------- Build static pieces ----------
+  const LAMPS = { strikes: 2, outs: 2 };
+  s.balls = 0;
+  document.querySelectorAll('.lrow').forEach(r => {
+    const k = r.dataset.k, label = { balls: '볼', strikes: '스트라이크', outs: '아웃' }[k];
+    r.querySelector('.dots').innerHTML = Array.from({ length: LAMPS[k] }, (_, i) =>
+      `<button class="dot" type="button" data-i="${i}" aria-label="${label} ${i + 1}개로 맞추기"></button>`).join('');
+    r.addEventListener('click', e => {
+      const b = e.target.closest('.dot'); if (!b || s.over) return;
+      const i = +b.dataset.i;
+      commit(() => { s[k] = s[k] === i + 1 ? i : i + 1; s.last = `<b>카운트 수정</b> · ${s.strikes}스트라이크 ${s.outs}아웃`; return 'tick'; });
+    });
+  });
+  function toggleBase(i) {
+    if (s.over) return;
+    commit(() => { s.bases[i] = !s.bases[i]; s.last = `<b>${i + 1}루 주자</b> ${s.bases[i] ? '표시' : '지움'}`; return s.bases[i] ? 'ball' : 'tick'; });
+  }
+  document.querySelectorAll('.base').forEach(b => b.addEventListener('click', () => toggleBase(+b.dataset.b)));
+  document.querySelector('.ctrls').addEventListener('click', e => {
+    const b = e.target.closest('[data-a]'); if (b && !b.disabled) act(b.dataset.a);
+  });
+
+  // ---------- Render ----------
+  const lum = hex => {
+    const n = parseInt(hex.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255].map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; });
+    return .2126 * c[0] + .7152 * c[1] + .0722 * c[2];
+  };
+  function render() {
+    const tots = [total(0), total(1)];
+    $('inningLabel').textContent = s.over ? '경기 종료' : inningLabel();
+    $('arrow').textContent = s.over ? '■' : s.half ? '▼' : '▲';
+    [0, 1].forEach(t => {
+      const r = $('row' + t);
+      r.style.setProperty('--c', s.colors[t]);
+      r.querySelector('.stripe').style.boxShadow = lum(s.colors[t]) < .03 ? 'inset 0 0 0 2px #3a5d4a' : '';
+      r.querySelector('.name').textContent = s.names[t];
+      r.querySelector('.side').textContent = t ? '홈 · 말 공격' : '원정 · 초 공격';
+      r.classList.toggle('batting', !s.over && s.half === t);
+      const rn = r.querySelector('.runs');
+      rn.textContent = tots[t];
+      if (prevTotals[t] !== tots[t]) { rn.classList.remove('bump'); void rn.offsetWidth; rn.classList.add('bump'); }
+    });
+    prevTotals = tots;
+    document.querySelectorAll('.lrow').forEach(r => r.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('on', i < s[r.dataset.k])));
+    document.querySelectorAll('.base').forEach(b => b.setAttribute('aria-pressed', String(!!s.bases[+b.dataset.b])));
+    document.querySelectorAll('.ctrls [data-a]').forEach(b => { b.disabled = s.over && b.dataset.a !== 'runMinus'; });
+    $('undoBtn').disabled = !undoStack.length;
+    $('status').innerHTML = s.last || '<b>스트라이크</b>가 3개면 자동으로 아웃, 3아웃이면 공수 교대됩니다. 주자는 베이스를 눌러 표시하세요.';
+
+    // Line score
+    const cols = Math.max(s.innings, s.inning);
+    let h = '<thead><tr><th class="tn">팀</th>';
+    for (let i = 1; i <= cols; i++) h += `<th class="${i === s.inning && !s.over ? 'ccol' : ''}">${i}</th>`;
+    h += '<th>R</th></tr></thead><tbody>';
+    [0, 1].forEach(t => {
+      h += `<tr><th class="tn"><i style="background:${s.colors[t]}"></i>${esc(s.names[t])}</th>`;
+      for (let i = 0; i < cols; i++) {
+        const played = t === 0 ? i < s.inning : (i < s.inning - 1 || (i === s.inning - 1 && s.half === 1));
+        let v = played ? (s.line[t][i] || 0) : '';
+        if (t === 1 && s.over && s.xBottom && i === s.inning - 1) v = 'X';
+        const cur = !s.over && i === s.inning - 1 && t === s.half;
+        h += `<td class="${cur ? 'cur' : ''}">${v}</td>`;
+      }
+      h += `<td class="tot">${tots[t]}</td></tr>`;
+    });
+    $('lineTable').innerHTML = h + '</tbody>';
+
+    // Final overlay
+    if (s.over && !finalDismissed) {
+      const w = tots[0] > tots[1] ? 0 : 1;
+      $('finalWinner').textContent = `${s.names[w]} 승리!`;
+      $('finalScore').textContent = `${tots[0]} : ${tots[1]}`;
+      $('finalNote').textContent = `${s.names[0]} ${tots[0]} · ${s.names[1]} ${tots[1]} · ${s.inning}회${s.inning > s.innings ? ' (연장)' : ''}`;
+      $('finalWrap').hidden = false;
+    } else $('finalWrap').hidden = true;
+    if (!s.over) finalDismissed = false;
+  }
+  let finalDismissed = false;
+  $('finalUndo').onclick = () => { finalDismissed = false; undo(); };
+  $('finalClose').onclick = () => { finalDismissed = true; $('finalWrap').hidden = true; };
+  $('finalNew').onclick = () => {
+    commit(() => { const n = s.names, c = s.colors, i = s.innings; s = fresh(n, c, i); s.last = '<b>새 경기</b> · 되돌리기로 이전 경기를 복구할 수 있습니다'; return 'change'; });
+  };
+
+  // ---------- Sound controls ----------
+  function renderSound() {
+    $('soundBtn').classList.toggle('off', !prefs.on);
+    $('soundBtn').firstChild.textContent = prefs.on ? '소리' : '소리 꺼짐';
+    $('sndToggle').textContent = prefs.on ? '켜짐' : '꺼짐';
+    $('sndToggle').classList.toggle('off', !prefs.on);
+    $('vol').value = prefs.vol;
+    $('runSnd').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === prefs.run)));
+  }
+  function toggleSound() { prefs.on = !prefs.on; savePrefs(); renderSound(); if (prefs.on) play('tick'); }
+  $('runSnd').innerHTML = '<button type="button" data-k="random">랜덤</button>' +
+    Object.entries(RUN_SOUNDS).map(([k, [nm]]) => `<button type="button" data-k="${k}">${nm}</button>`).join('');
+  $('runSnd').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    prefs.run = b.dataset.k; savePrefs(); renderSound(); play(b.dataset.k === 'random' ? 'run' : b.dataset.k, true);
+  });
+  $('vol').addEventListener('input', e => { prefs.vol = +e.target.value; savePrefs(); });
+  $('vol').addEventListener('change', () => play('ball', true));
+  $('sndToggle').onclick = toggleSound;
+  $('soundBtn').onclick = toggleSound;
+
+  // ---------- Settings ----------
+  const sheet = $('sheet'), resetBtn = $('resetBtn');
+  let draftColors = [];
+  $('innPresets').innerHTML = INNING_PRESETS.map(n => `<button type="button" data-n="${n}">${n}</button>`).join('');
+  const syncInn = () => { const v = parseInt($('innings').value, 10); $('innPresets').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.n === v))); };
+  $('innPresets').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { $('innings').value = b.dataset.n; syncInn(); } });
+  const stepI = d => { $('innings').value = Math.max(1, Math.min(15, (parseInt($('innings').value, 10) || s.innings) + d)); syncInn(); };
+  $('iMinus').onclick = () => stepI(-1); $('iPlus').onclick = () => stepI(1);
+  $('innings').addEventListener('input', syncInn);
+
+  [0, 1].forEach(i => {
+    $('ts' + i).innerHTML = `
+      <div class="teamset-top"><span class="pv" id="pv${i}"></span><span class="lbl">${i ? '홈' : '원정'}</span><input id="n${i}" maxlength="10" aria-label="${i ? '홈' : '원정'} 팀 이름"></div>
+      <div class="swatches" role="group" aria-label="${i ? '홈' : '원정'} 팀 색상">
+        ${PALETTE.map(([nm, hex]) => `<button type="button" class="sw" data-c="${hex}" style="background:${hex}" title="${nm}" aria-label="${nm}"></button>`).join('')}
+        <label class="custom" title="직접 고르기">＋<input type="color" id="cc${i}" aria-label="색상 직접 고르기"></label>
+      </div>`;
+    $('ts' + i).querySelector('.swatches').addEventListener('click', e => { const b = e.target.closest('.sw'); if (b) setDraft(i, b.dataset.c); });
+    $('cc' + i).addEventListener('input', e => setDraft(i, e.target.value));
+  });
+  function setDraft(i, hex) {
+    draftColors[i] = hex; $('pv' + i).style.background = hex; $('cc' + i).value = hex;
+    $('ts' + i).querySelectorAll('.sw').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.c.toLowerCase() === hex.toLowerCase())));
+  }
+  function openSheet() {
+    draftColors = s.colors.slice();
+    [0, 1].forEach(i => { $('n' + i).value = s.names[i]; setDraft(i, s.colors[i]); });
+    $('innings').value = s.innings; syncInn(); renderSound();
+    resetBtn.classList.remove('armed'); resetBtn.textContent = '새 경기 시작';
+    sheet.hidden = false; $('n0').focus();
+  }
+  const closeSheet = () => { sheet.hidden = true; };
+  $('setBtn').onclick = openSheet; $('closeBtn').onclick = closeSheet;
+  sheet.addEventListener('click', e => { if (e.target === sheet) closeSheet(); });
+  $('setForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const names = [0, 1].map(i => $('n' + i).value.trim() || s.names[i]);
+    const inn = Math.max(1, Math.min(15, parseInt($('innings').value, 10) || s.innings));
+    const colors = draftColors.slice();
+    commit(() => { s.names = names; s.colors = colors; s.innings = inn; s.last = `<b>설정 변경</b> · ${inn}이닝 경기`; return 'tick'; });
+    closeSheet();
+  });
+  resetBtn.onclick = () => {
+    if (!resetBtn.classList.contains('armed')) { resetBtn.classList.add('armed'); resetBtn.textContent = '한 번 더 누르면 초기화'; return; }
+    commit(() => { const n = s.names, c = s.colors, i = s.innings; s = fresh(n, c, i); s.last = '<b>새 경기</b> · 되돌리기로 이전 경기를 복구할 수 있습니다'; return 'change'; });
+    closeSheet();
+  };
+
+  // ---------- Toolbar, keyboard, wake ----------
+  $('undoBtn').onclick = undo;
+  $('fsBtn').onclick = () => {
+    try { if (document.fullscreenElement) document.exitFullscreen?.(); else document.documentElement.requestFullscreen?.().catch(() => {}); } catch (e) {}
+  };
+  document.addEventListener('fullscreenchange', () => { $('fsBtn').textContent = document.fullscreenElement ? '창 모드' : '전체화면'; });
+  const KEYS = { s: 'strike', o: 'out', r: 'run', n: 'clearCount' };
+  document.addEventListener('keydown', e => {
+    if (!sheet.hidden) { if (e.key === 'Escape') closeSheet(); return; }
+    if (e.target.closest('input') || e.metaKey || e.ctrlKey || e.altKey) return;
+    const k = e.key.toLowerCase();
+    if (KEYS[k]) { e.preventDefault(); act(KEYS[k]); }
+    else if (['1', '2', '3'].includes(k)) toggleBase(+k - 1);
+    else if (k === 'z') { e.preventDefault(); undo(); }
+    else if (k === 'm') toggleSound();
+  });
+  let lock = null;
+  async function wake() { try { if (!lock && navigator.wakeLock) { lock = await navigator.wakeLock.request('screen'); lock.addEventListener('release', () => lock = null); } } catch (e) {} }
+  document.addEventListener('pointerdown', wake, { once: true });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') wake(); });
+
+  render(); renderSound();
+})();
+</script>
+</body>
+</html>
