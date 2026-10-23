@@ -69,6 +69,7 @@ button:disabled { opacity: .35; cursor: not-allowed; }
 }
 .tbtn:hover:not(:disabled) { border-color: var(--muted); }
 .tbtn.off { color: var(--muted); text-decoration: line-through; }
+.tbtn.armed { background: var(--lamp-o); border-color: var(--lamp-o); color: #fff; }
 .tbtn kbd { font-family: var(--f-num); font-size: .7rem; color: var(--muted); margin-left: 4px; }
 .status { font-size: .88rem; color: var(--muted); min-height: 1.3em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .status b { color: var(--fg); font-weight: 600; }
@@ -153,6 +154,8 @@ button:disabled { opacity: .35; cursor: not-allowed; }
 .act.out { --k: var(--lamp-o); }
 .act.run { --k: var(--amber); background: var(--amber); color: #1d1600; }
 .act.run small { color: #5a4600; }
+.act.read { --k: var(--fg); grid-column: 1 / -1; min-height: 56px; font-size: clamp(1.05rem, 3.4vw, 1.35rem); }
+.act.read.speaking { background: color-mix(in srgb, var(--fg) 30%, var(--board-2)); }
 .act.minor { min-height: 46px; font-family: var(--f-ui); font-weight: 600; font-size: .92rem; }
 @media (hover: none) { .act small, .tbtn kbd, .hint { display: none; } }
 
@@ -216,6 +219,7 @@ thead th.ccol { color: var(--amber); }
   <div class="tools">
     <button class="tbtn" id="soundBtn" type="button">소리<kbd>M</kbd></button>
     <button class="tbtn" id="undoBtn" type="button">되돌리기<kbd>Z</kbd></button>
+    <button class="tbtn" id="quickReset" type="button">초기화</button>
     <button class="tbtn" id="setBtn" type="button">설정</button>
     <button class="tbtn" id="fsBtn" type="button">전체화면</button>
   </div>
@@ -249,6 +253,7 @@ thead th.ccol { color: var(--amber); }
     <button class="act minor" type="button" data-a="runMinus">득점 −1</button>
     <button class="act minor" type="button" data-a="change">공수 교대</button>
     <button class="act minor" type="button" data-a="clearCount">다음 타자</button>
+    <button class="act read" type="button" id="readBtn">스코어 읽어주기<small>V</small></button>
   </section>
 
   <section class="panel linewrap" aria-label="이닝별 점수">
@@ -256,7 +261,7 @@ thead th.ccol { color: var(--amber); }
   </section>
 </main>
 
-<footer class="hint">키보드: S 스트라이크 · O 아웃 · R 득점 · 1·2·3 주자 · Z 되돌리기 · M 소리</footer>
+<footer class="hint">키보드: S 스트라이크 · O 아웃 · R 득점 · 1·2·3 주자 · V 스코어 읽기 · Z 되돌리기 · M 소리</footer>
 
 <div class="sheet-wrap" id="finalWrap" hidden>
   <div class="sheet final">
@@ -291,11 +296,23 @@ thead th.ccol { color: var(--amber); }
       <div class="teamset" id="ts1"></div>
     </div>
     <div class="field">
-      <label>소리</label>
+      <label>소리 · 막대는 효과음 크기</label>
       <div class="soundrow">
         <button class="tbtn" type="button" id="sndToggle">켜짐</button>
         <input type="range" id="vol" min="0" max="100" step="5" aria-label="음량">
       </div>
+      <label>음성 안내 · 스트라이크, 아웃, 공수 교대를 읽어줍니다</label>
+      <div class="soundrow">
+        <button class="tbtn" type="button" id="voiceToggle">켜짐</button>
+        <button class="tbtn" type="button" id="voiceTest">미리 듣기</button>
+      </div>
+      <label>목소리 · 눌러서 들어보고 가장 또렷한 걸 고르세요</label>
+      <div class="presets ko" id="voiceList"></div>
+      <label>음성 속도</label>
+      <div class="presets ko" id="rateSnd"></div>
+      <label>음성 높이 · 야외 스피커에서는 높을수록 잘 들립니다</label>
+      <div class="presets ko" id="pitchSnd"></div>
+      <p class="note">음성은 기기가 낼 수 있는 최대 크기로 나옵니다. 위 음량 막대는 효과음에만 적용돼요. 효과음을 낮추면 음성이 더 또렷하게 들립니다.</p>
       <label>득점 소리 · 눌러서 미리 듣기</label>
       <div class="presets ko" id="runSnd"></div>
     </div>
@@ -334,8 +351,9 @@ thead th.ccol { color: var(--amber); }
   const inningLabel = () => `${s.inning}회 ${s.half ? '말' : '초'}`;
 
   // ---------- Sound (synthesized, no files) ----------
-  let prefs = { on: true, vol: 70, run: 'random' };
+  let prefs = { on: true, vol: 70, run: 'random', voice: true, rate: 1.15, pitch: 1.8, voiceName: '', v2: true };
   try { Object.assign(prefs, JSON.parse(localStorage.getItem(PKEY)) || {}); } catch (e) {}
+  if (!prefs.v2) { prefs.rate = 1.15; prefs.pitch = 1.8; prefs.v2 = true; }
   const savePrefs = () => { try { localStorage.setItem(PKEY, JSON.stringify(prefs)); } catch (e) {} };
   let ctx = null, lastRun = '', noiseBuf = null;
   function ac() {
@@ -412,6 +430,62 @@ thead th.ccol { color: var(--amber); }
     } catch (e) {}
   }
 
+  // ---------- Voice announcer (Web Speech, Korean) ----------
+  const synth = window.speechSynthesis || null;
+  let koVoice = null, koVoices = [], sayTimer = null, say = '';
+  function pickVoice() {
+    if (!synth) return;
+    try {
+      koVoices = synth.getVoices().filter(v => /^ko/i.test(v.lang));
+      koVoice = koVoices.find(v => v.name === prefs.voiceName)
+        || koVoices.find(v => /sunhi|yuna|heami|google/i.test(v.name))
+        || koVoices.find(v => /natural|online/i.test(v.name)) || koVoices[0] || null;
+      renderVoices();
+    } catch (e) {}
+  }
+  function renderVoices() {
+    const box = document.getElementById('voiceList'); if (!box) return;
+    if (!koVoices.length) { box.innerHTML = '<span class="note">이 기기에서 고를 수 있는 한국어 목소리가 하나뿐이에요.</span>'; return; }
+    box.innerHTML = koVoices.map((v, i) => {
+      const nm = v.name.replace(/^(Microsoft|Google)\s*/i, '').replace(/\s*-\s*Korean.*$/i, '').replace(/\(.*?\)/g, '').trim() || `목소리 ${i + 1}`;
+      return `<button type="button" data-v="${i}" aria-pressed="${koVoice === v}">${esc(nm)}</button>`;
+    }).join('');
+  }
+  if (synth) { pickVoice(); try { synth.addEventListener('voiceschanged', pickVoice); } catch (e) {} }
+  function speak(text, force, delay = 0) {
+    if (!synth || !text || (!force && (!prefs.on || !prefs.voice))) return;
+    clearTimeout(sayTimer);
+    sayTimer = setTimeout(() => {
+      try {
+        synth.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'ko-KR'; if (koVoice) u.voice = koVoice;
+        u.rate = prefs.rate; u.pitch = prefs.pitch; u.volume = 1;
+        synth.speak(u);
+      } catch (e) {}
+    }, delay);
+  }
+  // iOS/Safari: unlock speech on the first touch
+  document.addEventListener('pointerdown', () => { try { if (synth) { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); } } catch (e) {} }, { once: true });
+  const KO_N = ['', '원', '투', '쓰리'];
+  function scoreText() {
+    const a = total(0), h = total(1);
+    const pts = `${s.names[0]} ${a}점, ${s.names[1]} ${h}점.`;
+    if (s.over) return `경기 종료. ${pts} ${s.names[a > h ? 0 : 1]} 승리.`;
+    const lead = a === h ? '동점입니다.' : `${s.names[a > h ? 0 : 1]} ${Math.abs(a - h)}점 리드.`;
+    const outs = s.outs ? `${KO_N[s.outs]} 아웃` : '노 아웃';
+    const st = s.strikes ? `, ${KO_N[s.strikes]} 스트라이크` : '';
+    const on = [0, 1, 2].filter(i => s.bases[i]).map(i => `${i + 1}루`);
+    const runners = on.length === 3 ? '주자 만루.' : on.length ? `주자 ${on.join(', ')}.` : '주자 없음.';
+    return `${halfSay()}, ${s.names[s.half]} 공격. ${pts} ${lead} ${outs}${st}. ${runners}`;
+  }
+  function readScore() {
+    if (!synth) { $('readBtn').firstChild.textContent = '이 브라우저는 음성 미지원'; return; }
+    speak(scoreText(), true);
+    $('readBtn').classList.add('speaking'); setTimeout(() => $('readBtn').classList.remove('speaking'), 600);
+  }
+  const halfSay = () => `${s.inning}회 ${s.half ? '말' : '초'}`;
+
   // ---------- Game logic ----------
   const resetCount = () => { s.balls = 0; s.strikes = 0; };
   function addRun(n) {
@@ -437,16 +511,18 @@ thead th.ccol { color: var(--amber); }
     if (s.outs >= 3) {
       endHalf();
       s.last = s.over ? `<b>${prefix} · 3아웃</b> · 경기 종료` : `<b>${prefix} · 3아웃 공수 교대</b> → ${inningLabel()}`;
+      say = `${prefix === '삼진 아웃' ? '삼진! ' : ''}쓰리 아웃! 공수 교대! ${halfSay()}`;
       return s.over ? 'win' : 'change';
     }
     s.last = `<b>${prefix}</b> · ${s.outs}아웃`;
+    say = `${prefix === '삼진 아웃' ? '삼진 아웃! ' : ''}${KO_N[s.outs]} 아웃!`;
     return prefix === '삼진 아웃' ? 'strikeout' : 'out';
   }
   const ACTIONS = {
     strike() {
       s.strikes++;
       if (s.strikes >= 3) return doOut('삼진 아웃');
-      s.last = `<b>스트라이크</b> · ${s.strikes}스트라이크`; return 'strike';
+      s.last = `<b>스트라이크</b> · ${s.strikes}스트라이크`; say = `${KO_N[s.strikes]} 스트라이크!`; return 'strike';
     },
     out() { return doOut('아웃'); },
     run() {
@@ -462,18 +538,25 @@ thead th.ccol { color: var(--amber); }
     change() {
       endHalf();
       s.last = s.over ? '<b>공수 교대</b> · 경기 종료' : `<b>공수 교대</b> → ${inningLabel()}`;
+      say = `공수 교대. ${halfSay()}`;
       return s.over ? 'win' : 'change';
     },
-    clearCount() { resetCount(); s.last = '<b>다음 타자</b> · 스트라이크 초기화'; return 'tick'; }
+    clearCount() { resetCount(); s.last = '<b>다음 타자</b> · 스트라이크 초기화'; say = '다음 타자'; return 'tick'; }
   };
 
   let prevTotals = [total(0), total(1)];
   function commit(fn) {
-    const snap = JSON.stringify(s);
+    const snap = JSON.stringify(s), wasOver = s.over;
+    say = '';
     const snd = fn();
     if (snd === null) return;
     undoStack.push(snap); if (undoStack.length > 300) undoStack.shift();
     save(); render(); play(snd);
+    if (s.over && !wasOver) {
+      const a = total(0), h = total(1);
+      say = `경기 종료! ${s.names[a > h ? 0 : 1]} 승리. ${a} 대 ${h}`;
+    }
+    speak(say, false, snd === 'win' ? 1300 : snd === 'run' || snd === 'change' ? 450 : 150);
   }
   function act(name) {
     if (s.over && name !== 'runMinus') return;
@@ -501,7 +584,7 @@ thead th.ccol { color: var(--amber); }
   });
   function toggleBase(i) {
     if (s.over) return;
-    commit(() => { s.bases[i] = !s.bases[i]; s.last = `<b>${i + 1}루 주자</b> ${s.bases[i] ? '표시' : '지움'}`; return s.bases[i] ? 'ball' : 'tick'; });
+    commit(() => { s.bases[i] = !s.bases[i]; s.last = `<b>${i + 1}루 주자</b> ${s.bases[i] ? '표시' : '지움'}`; if (s.bases[i]) say = `${i + 1}루 주자`; return s.bases[i] ? 'ball' : 'tick'; });
   }
   document.querySelectorAll('.base').forEach(b => b.addEventListener('click', () => toggleBase(+b.dataset.b)));
   document.querySelector('.ctrls').addEventListener('click', e => {
@@ -578,8 +661,33 @@ thead th.ccol { color: var(--amber); }
     $('sndToggle').classList.toggle('off', !prefs.on);
     $('vol').value = prefs.vol;
     $('runSnd').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === prefs.run)));
+    $('voiceToggle').textContent = prefs.voice ? '켜짐' : '꺼짐';
+    $('voiceToggle').classList.toggle('off', !prefs.voice);
+    $('rateSnd').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.r === prefs.rate)));
+    $('pitchSnd').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.p === prefs.pitch)));
   }
-  function toggleSound() { prefs.on = !prefs.on; savePrefs(); renderSound(); if (prefs.on) play('tick'); }
+  $('voiceList').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    koVoice = koVoices[+b.dataset.v]; prefs.voiceName = koVoice.name; savePrefs(); renderVoices();
+    speak('투 스트라이크! 원 아웃!', true);
+  });
+  renderVoices();
+  $('pitchSnd').innerHTML = [[1, '보통'], [1.4, '높게'], [1.8, '아주 높게'], [2, '최고']].map(([p, nm]) => `<button type="button" data-p="${p}">${nm}</button>`).join('');
+  $('pitchSnd').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    prefs.pitch = +b.dataset.p; savePrefs(); renderSound(); speak('투 스트라이크! 원 아웃!', true);
+  });
+  $('rateSnd').innerHTML = [[.9, '천천히'], [1, '보통'], [1.15, '또박또박 빠르게'], [1.3, '아주 빠르게']].map(([r, nm]) => `<button type="button" data-r="${r}">${nm}</button>`).join('');
+  $('rateSnd').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    prefs.rate = +b.dataset.r; savePrefs(); renderSound(); speak('투 스트라이크! 원 아웃!', true);
+  });
+  $('voiceToggle').onclick = () => { prefs.voice = !prefs.voice; savePrefs(); renderSound(); if (prefs.voice) speak('음성 안내를 켰습니다', true); };
+  $('voiceTest').onclick = () => {
+    if (!synth) { $('voiceTest').textContent = '이 브라우저는 음성 미지원'; return; }
+    speak('투 스트라이크! 원 아웃!', true);
+  };
+  function toggleSound() { prefs.on = !prefs.on; savePrefs(); renderSound(); if (prefs.on) play('tick'); else { try { synth && synth.cancel(); } catch (e) {} } }
   $('runSnd').innerHTML = '<button type="button" data-k="random">랜덤</button>' +
     Object.entries(RUN_SOUNDS).map(([k, [nm]]) => `<button type="button" data-k="${k}">${nm}</button>`).join('');
   $('runSnd').addEventListener('click', e => {
@@ -641,6 +749,18 @@ thead th.ccol { color: var(--amber); }
 
   // ---------- Toolbar, keyboard, wake ----------
   $('undoBtn').onclick = undo;
+  $('readBtn').onclick = readScore;
+  let armTimer = null;
+  const qr = $('quickReset');
+  function disarm() { clearTimeout(armTimer); qr.classList.remove('armed'); qr.textContent = '초기화'; }
+  qr.onclick = () => {
+    if (!qr.classList.contains('armed')) {
+      qr.classList.add('armed'); qr.textContent = '한 번 더 누르면 초기화';
+      armTimer = setTimeout(disarm, 3000); return;
+    }
+    disarm(); finalDismissed = false;
+    commit(() => { const n = s.names, c = s.colors, i = s.innings; s = fresh(n, c, i); s.last = '<b>초기화</b> · 0 : 0 새 경기 · 실수였다면 되돌리기를 누르세요'; say = '새 경기를 시작합니다. 1회 초'; return 'change'; });
+  };
   $('fsBtn').onclick = () => {
     try { if (document.fullscreenElement) document.exitFullscreen?.(); else document.documentElement.requestFullscreen?.().catch(() => {}); } catch (e) {}
   };
@@ -652,6 +772,7 @@ thead th.ccol { color: var(--amber); }
     const k = e.key.toLowerCase();
     if (KEYS[k]) { e.preventDefault(); act(KEYS[k]); }
     else if (['1', '2', '3'].includes(k)) toggleBase(+k - 1);
+    else if (k === 'v') readScore();
     else if (k === 'z') { e.preventDefault(); undo(); }
     else if (k === 'm') toggleSound();
   });
