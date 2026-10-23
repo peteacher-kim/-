@@ -452,18 +452,37 @@ thead th.ccol { color: var(--amber); }
     }).join('');
   }
   if (synth) { pickVoice(); try { synth.addEventListener('voiceschanged', pickVoice); } catch (e) {} }
+  function voiceIssue(msg) {
+    const st = document.getElementById('status'); if (st) st.innerHTML = `<b>음성 안내</b> · ${msg}`;
+  }
   function speak(text, force, delay = 0) {
-    if (!synth || !text || (!force && (!prefs.on || !prefs.voice))) return;
+    if (!text || (!force && (!prefs.on || !prefs.voice))) return;
+    if (!synth || !window.SpeechSynthesisUtterance) { voiceIssue('이 브라우저는 음성 안내를 지원하지 않아요. 크롬이나 사파리로 열어 주세요.'); return; }
     clearTimeout(sayTimer);
-    sayTimer = setTimeout(() => {
+    const doSpeak = () => {
       try {
-        synth.cancel();
         const u = new SpeechSynthesisUtterance(text);
-        u.lang = 'ko-KR'; if (koVoice) u.voice = koVoice;
+        u.lang = 'ko-KR';
+        if (koVoice) { const v = synth.getVoices().find(x => x.name === koVoice.name); if (v) u.voice = v; }
         u.rate = prefs.rate; u.pitch = prefs.pitch; u.volume = 1;
+        let started = false;
+        u.onstart = () => { started = true; };
+        u.onend = () => { started = true; };
+        u.onerror = e => {
+          started = true;
+          if (!/interrupted|canceled/.test(e.error || '')) voiceIssue(`음성이 나오지 않았어요 (${e.error || '오류'}). 화면을 한 번 터치한 뒤 다시 눌러 보세요.`);
+        };
+        if (synth.resume) synth.resume();
         synth.speak(u);
-      } catch (e) {}
-    }, delay);
+        setTimeout(() => {
+          if (!started && !synth.speaking) voiceIssue('음성이 나오지 않았어요. 기기의 텍스트 음성 변환(TTS) 설정과 한국어 음성을 확인해 주세요.');
+        }, 3500);
+      } catch (e) { voiceIssue('음성 안내를 시작하지 못했어요.'); }
+    };
+    const go = () => {
+      if (synth.speaking || synth.pending) { synth.cancel(); setTimeout(doSpeak, 80); } else doSpeak();
+    };
+    if (delay) sayTimer = setTimeout(go, delay); else go();
   }
   // iOS/Safari: unlock speech on the first touch
   document.addEventListener('pointerdown', () => { try { if (synth) { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); } } catch (e) {} }, { once: true });
