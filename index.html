@@ -208,9 +208,38 @@ thead th.ccol { color: var(--amber); }
 .field > label { font-size: .8rem; color: var(--muted); letter-spacing: .04em; }
 .field input[type=number], .teamset input:not([type=color]) { font: inherit; font-size: 1rem; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%; }
 .field textarea { font: inherit; font-size: .95rem; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%; resize: vertical; user-select: text; }
-.lu { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.lu > div { display: grid; gap: 4px; min-width: 0; }
-.lu span { font-size: .78rem; color: var(--muted); }
+.sheet.wide { width: min(820px, 100%); }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--bg); padding: 4px; border-radius: 12px; border: 1px solid var(--line); }
+.seg button { border: 0; background: transparent; border-radius: 9px; min-height: 44px; font-weight: 600; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--amber); color: #1d1600; }
+details { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: var(--bg); }
+details summary { cursor: pointer; font-size: .88rem; font-weight: 600; min-height: 32px; display: flex; align-items: center; }
+details[open] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+details textarea { box-sizing: border-box; max-width: 100%; }
+.dragnote b { color: var(--fg); font-weight: 600; }
+.lu { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.col { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.colhead { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: .9rem; min-width: 0; }
+.colhead i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.colhead span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cnt { margin-left: auto; flex: none; font-family: var(--f-num); font-size: .8rem; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--fg); }
+.cnt.warn { color: var(--lamp-o); border-color: var(--lamp-o); }
+.colsub { font-size: .76rem; color: var(--muted); margin-top: 4px; }
+.dl { display: grid; gap: 4px; min-height: 52px; padding: 6px; border: 1px dashed var(--line); border-radius: 10px; background: var(--bg); align-content: start; }
+.dl.bench { min-height: 44px; }
+.dl.over { border-color: var(--amber); border-style: solid; }
+.dl .empty { font-size: .78rem; color: var(--muted); text-align: center; padding: 8px 4px; }
+.li { display: flex; align-items: center; gap: 6px; padding: 6px 4px 6px 8px; min-height: 42px; border-radius: 8px; background: var(--board-2); border: 1px solid var(--line); cursor: grab; touch-action: manipulation; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; font-size: .95rem; }
+.li .grip { color: var(--muted); font-size: .85rem; letter-spacing: -2px; }
+.li b { font-family: var(--f-num); color: var(--amber); min-width: 1.2em; text-align: right; }
+.li .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.li .mv { flex: none; border: 0; background: transparent; color: var(--muted); padding: 0 6px; min-height: 32px; font-size: .74rem; border-radius: 6px; }
+.li .mv:hover { color: var(--fg); background: var(--board); }
+.bench .li { background: transparent; color: var(--muted); }
+.li.pressing { background: color-mix(in srgb, var(--amber) 28%, var(--board-2)); transition: background .3s; }
+.li.ghost { position: fixed; z-index: 60; pointer-events: none; margin: 0; box-shadow: 0 14px 34px rgb(0 0 0 / .55); border-color: var(--amber); background: var(--board); color: var(--fg); transform: scale(1.04); cursor: grabbing; }
+.ph { height: 42px; border-radius: 8px; border: 2px dashed var(--amber); background: color-mix(in srgb, var(--amber) 14%, transparent); }
+body.dragging, body.dragging * { cursor: grabbing !important; }
 .note { font-size: .8rem; color: var(--muted); margin: 0; line-height: 1.5; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; }
 .primary { background: var(--amber); color: #1d1600; border: 0; border-radius: 10px; padding: 12px 18px; font-weight: 700; min-height: 46px; }
@@ -309,7 +338,7 @@ thead th.ccol { color: var(--amber); }
 </div>
 
 <div class="sheet-wrap" id="sheet" hidden>
-  <form class="sheet" id="setForm">
+  <form class="sheet wide" id="setForm">
     <h2>경기 설정</h2>
     <div class="field">
       <label for="innings">정규 이닝 수</label>
@@ -323,20 +352,31 @@ thead th.ccol { color: var(--amber); }
     </div>
     <div class="field">
       <label>타순 · 전원타격제 (팀원 모두 치면 공수 교대)</label>
-      <p class="note">학생 명단은 이 기기에만 저장되고 인터넷에 올라가지 않아요.</p>
-      <label for="rosterPaste">학급 명단 붙여넣기 · 한 줄에 한 명, '1반'처럼 반 이름 줄로 구분</label>
-      <textarea id="rosterPaste" rows="4" placeholder="1반&#10;1101 김OO&#10;1102 이OO&#10;2반&#10;1201 박OO"></textarea>
-      <label>반 고르기 · 누르면 아래 두 팀 타순이 채워져요</label>
-      <div class="presets ko" id="classList"></div>
-      <label>팀 나누는 방법</label>
-      <div class="presets ko" id="splitWays"></div>
-      <div class="lu">
-        <div><span id="luLbl0">원정 타순</span><textarea id="lu0" rows="9" aria-label="원정 팀 타순"></textarea></div>
-        <div><span id="luLbl1">홈 타순</span><textarea id="lu1" rows="9" aria-label="홈 팀 타순"></textarea></div>
+      <div class="seg" id="modeSeg" role="group" aria-label="경기 방식">
+        <button type="button" data-m="intra">반 안에서 경기</button>
+        <button type="button" data-m="inter">반 대항 경기</button>
       </div>
-      <p class="note">한 줄에 한 명씩 타순대로 적어요. 결석한 학생은 그 줄을 지우면 됩니다. 비워 두면 번호(1번~9번)로 표시돼요.</p>
-      <label>명단이 없을 때 타자 수</label>
+      <details id="rosterBox">
+        <summary>학급 명단 붙여넣기 · 수정</summary>
+        <textarea id="rosterPaste" rows="5" placeholder="1반&#10;1101 김OO&#10;1102 이OO&#10;2반&#10;1201 박OO"></textarea>
+        <p class="note">한 줄에 한 명, '1반'처럼 반 이름 줄로 구분해요. 명단은 이 기기에만 저장되고 인터넷에 올라가지 않아요.</p>
+      </details>
+      <div id="intraPick" class="field">
+        <label>반 고르기 · 한 반을 두 팀으로 나눠요</label>
+        <div class="presets ko" id="classList"></div>
+        <label>팀 나누는 방법</label>
+        <div class="presets ko" id="splitWays"></div>
+      </div>
+      <div id="interPick" class="field" hidden>
+        <label id="pickLbl0">원정 반</label>
+        <div class="presets ko" id="classList0"></div>
+        <label id="pickLbl1">홈 반</label>
+        <div class="presets ko" id="classList1"></div>
+      </div>
+      <label>팀 인원 · 반 대항 때 타순에 먼저 넣을 인원, 명단이 없을 때 타자 수</label>
       <div class="presets" id="batPresets"></div>
+      <p class="note dragnote">이름을 <b>마우스로 끌거나</b>, <b>화면을 길게 눌러</b> 옮기세요. 순서 바꾸기, 상대 팀으로 보내기, 대기(결석)로 빼기 모두 같은 방법이에요.</p>
+      <div class="lu" id="luBoard"></div>
     </div>
     <div class="field">
       <label>팀 이름과 색상</label>
@@ -385,7 +425,7 @@ thead th.ccol { color: var(--amber); }
   const INNING_PRESETS = [3, 5, 6, 7, 9];
   const fresh = (p = {}) => ({
     names: p.names || ['원정', '홈'], colors: p.colors || ['#2f6fe4', '#e23b3b'], innings: p.innings || 9,
-    lineup: p.lineup || [[], []], batters: p.batters || 9,
+    lineup: p.lineup || [[], []], bench: p.bench || [[], []], mode: p.mode || 'intra', batters: p.batters || 9,
     inning: 1, half: 0, balls: 0, strikes: 0, outs: 0, bases: [false, false, false],
     line: [[0], []], over: false, xBottom: false, last: '',
     bat: [0, 0], done: [], halfDone: false
@@ -395,6 +435,8 @@ thead th.ccol { color: var(--amber); }
   if (!s || !Array.isArray(s.line)) s = fresh();
   if (!Array.isArray(s.lineup)) s.lineup = [[], []];
   if (!s.batters) s.batters = 9;
+  if (!Array.isArray(s.bench)) s.bench = [[], []];
+  if (!s.mode) s.mode = 'intra';
   if (!Array.isArray(s.bat)) s.bat = [0, 0];
   if (!Array.isArray(s.done)) s.done = [];
   // Batting order helpers
@@ -851,11 +893,14 @@ thead th.ccol { color: var(--amber); }
   });
   function setDraft(i, hex) {
     draftColors[i] = hex; $('pv' + i).style.background = hex; $('cc' + i).value = hex;
+    if (!sheet.hidden) renderBoard();
     $('ts' + i).querySelectorAll('.sw').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.c.toLowerCase() === hex.toLowerCase())));
   }
   // ---------- Roster & batting order (device-only storage) ----------
   const RKEY = 'baseball-roster-v1';
-  let rosterText = '', pickedClass = '', splitWay = 'oddeven';
+  let rosterText = '', splitWay = 'oddeven', draftBatters = 9, draftMode = 'intra';
+  let picked = { intra: '', inter: ['', ''] };
+  const draft = { L: [[], []], B: [[], []] };
   try { rosterText = localStorage.getItem(RKEY) || ''; } catch (e) {}
   const cleanName = l => l.replace(/^[\s\d.)\-·:]+/, '').replace(/\s+\d+\s*$/, '').trim();
   function parseRoster(text) {
@@ -870,41 +915,158 @@ thead th.ccol { color: var(--amber); }
     });
     return groups.filter(g => g.list.length);
   }
+  const groups = () => parseRoster($('rosterPaste').value);
   const SPLITS = [['oddeven', '번호 홀수 · 짝수'], ['half', '앞 · 뒤 절반'], ['random', '무작위']];
   $('splitWays').innerHTML = SPLITS.map(([k, nm]) => `<button type="button" data-k="${k}">${nm}</button>`).join('');
   $('batPresets').innerHTML = [8, 9].map(n => `<button type="button" data-n="${n}">${n}명</button>`).join('');
-  let draftBatters = 9;
-  function renderRoster() {
-    const groups = parseRoster($('rosterPaste').value);
-    $('classList').innerHTML = groups.length
-      ? groups.map(g => `<button type="button" data-c="${esc(g.name)}" aria-pressed="${g.name === pickedClass}">${esc(g.name)} · ${g.list.length}명</button>`).join('')
-      : '<span class="note">위 칸에 명단을 붙여넣으면 반 목록이 나타나요.</span>';
+  const classBtns = (sel) => {
+    const g = groups();
+    return g.length ? g.map(x => `<button type="button" data-c="${esc(x.name)}" aria-pressed="${x.name === sel}">${esc(x.name)} · ${x.list.length}명</button>`).join('')
+      : '<span class="note">위 \'학급 명단 붙여넣기\'에 명단을 넣으면 반 목록이 나타나요.</span>';
+  };
+  function renderPickers() {
+    $('modeSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.m === draftMode)));
+    $('intraPick').hidden = draftMode !== 'intra';
+    $('interPick').hidden = draftMode !== 'inter';
+    $('classList').innerHTML = classBtns(picked.intra);
+    $('classList0').innerHTML = classBtns(picked.inter[0]);
+    $('classList1').innerHTML = classBtns(picked.inter[1]);
     $('splitWays').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === splitWay)));
     $('batPresets').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.n === draftBatters)));
+    if (!groups().length) $('rosterBox').open = true;
   }
-  function fillTeams() {
-    const g = parseRoster($('rosterPaste').value).find(x => x.name === pickedClass); if (!g) return;
+  function fillIntra() {
+    const g = groups().find(x => x.name === picked.intra); if (!g) return;
     let list = g.list.slice(), a = [], b = [];
     if (splitWay === 'random') { for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; } }
     if (splitWay === 'oddeven') list.forEach((nm, i) => (i % 2 ? b : a).push(nm));
     else { const k = Math.ceil(list.length / 2); a = list.slice(0, k); b = list.slice(k); }
-    $('lu0').value = a.join('\n'); $('lu1').value = b.join('\n');
+    draft.L = [a, b]; draft.B = [[], []];
+    $('n0').value = `${g.name} 1팀`; $('n1').value = `${g.name} 2팀`;
+    renderBoard();
   }
-  $('rosterPaste').addEventListener('input', () => { try { localStorage.setItem(RKEY, $('rosterPaste').value); } catch (e) {} renderRoster(); });
-  $('classList').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; pickedClass = b.dataset.c; renderRoster(); fillTeams(); });
-  $('splitWays').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; splitWay = b.dataset.k; renderRoster(); if (pickedClass) fillTeams(); });
-  $('batPresets').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; draftBatters = +b.dataset.n; renderRoster(); });
-  [0, 1].forEach(i => $('n' + i).addEventListener('input', () => { $('luLbl' + i).textContent = `${$('n' + i).value.trim() || (i ? '홈' : '원정')} 타순`; }));
+  function fillInter(t) {
+    const g = groups().find(x => x.name === picked.inter[t]); if (!g) return;
+    draft.L[t] = g.list.slice(0, draftBatters); draft.B[t] = g.list.slice(draftBatters);
+    $('n' + t).value = g.name;
+    renderBoard();
+  }
+  $('rosterPaste').addEventListener('input', () => { try { localStorage.setItem(RKEY, $('rosterPaste').value); } catch (e) {} renderPickers(); });
+  $('modeSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; draftMode = b.dataset.m; renderPickers(); });
+  $('classList').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; picked.intra = b.dataset.c; renderPickers(); fillIntra(); });
+  [0, 1].forEach(t => $('classList' + t).addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; picked.inter[t] = b.dataset.c; renderPickers(); fillInter(t); }));
+  $('splitWays').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; splitWay = b.dataset.k; renderPickers(); if (picked.intra) fillIntra(); });
+  $('batPresets').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; draftBatters = +b.dataset.n; renderPickers(); renderBoard(); });
+  [0, 1].forEach(i => $('n' + i).addEventListener('input', renderBoard));
+
+  // Board of four drop lists: L0/L1 batting orders, B0/B1 bench (대기·결석)
+  const listOf = name => (name[0] === 'L' ? draft.L : draft.B)[+name[1]];
+  function itemHTML(name, i, nm) {
+    const line = name[0] === 'L';
+    return `<div class="li" data-list="${name}" data-i="${i}"><span class="grip" aria-hidden="true">⋮⋮</span>${line ? `<b>${i + 1}</b>` : ''}<span class="nm">${esc(nm)}</span>` +
+      `<button type="button" class="mv" data-mv="1" aria-label="${esc(nm)} ${line ? '대기로 빼기' : '타순에 넣기'}">${line ? '대기 ↓' : '↑ 타순'}</button></div>`;
+  }
+  function renderBoard() {
+    $('luBoard').innerHTML = [0, 1].map(t => {
+      const n = draft.L[t].length, warn = n && (n < 8 || n > 9);
+      const nm = ($('n' + t).value || '').trim() || s.names[t];
+      return `<div class="col">
+        <div class="colhead"><i style="background:${draftColors[t] || s.colors[t]}"></i><span>${esc(nm)} 타순</span><span class="cnt${warn ? ' warn' : ''}">${n ? n + '명' : '번호'}</span></div>
+        <div class="dl" data-list="L${t}">${draft.L[t].map((x, i) => itemHTML('L' + t, i, x)).join('') || `<div class="empty">비어 있으면 1번~${draftBatters}번으로 표시돼요</div>`}</div>
+        <div class="colsub">대기 · 결석</div>
+        <div class="dl bench" data-list="B${t}">${draft.B[t].map((x, i) => itemHTML('B' + t, i, x)).join('') || '<div class="empty">여기로 끌어 놓으면 타순에서 빠져요</div>'}</div>
+      </div>`;
+    }).join('');
+  }
+  $('luBoard').addEventListener('click', e => {
+    const mv = e.target.closest('.mv'); if (!mv) return;
+    const li = mv.closest('.li'), from = li.dataset.list, i = +li.dataset.i;
+    const to = (from[0] === 'L' ? 'B' : 'L') + from[1];
+    const [nm] = listOf(from).splice(i, 1); listOf(to).push(nm); renderBoard();
+  });
+
+  // Drag: mouse drags right away; touch needs a long press so normal scrolling still works
+  let pend = null, drag = null, scrollTimer = null;
+  const formEl = $('setForm');
+  $('luBoard').addEventListener('pointerdown', e => {
+    const li = e.target.closest('.li'); if (!li || e.target.closest('.mv') || (e.button && e.button !== 0)) return;
+    pend = { li, id: e.pointerId, x: e.clientX, y: e.clientY, type: e.pointerType, timer: null };
+    if (e.pointerType !== 'mouse') {
+      li.classList.add('pressing');
+      pend.timer = setTimeout(() => pend && startDrag(pend.x, pend.y), 300);
+    }
+  });
+  function cancelPend() { if (!pend) return; clearTimeout(pend.timer); pend.li.classList.remove('pressing'); pend = null; }
+  function startDrag(x, y) {
+    const st = pend; pend = null; clearTimeout(st.timer);
+    const li = st.li, r = li.getBoundingClientRect();
+    li.classList.remove('pressing');
+    const ghost = li.cloneNode(true); ghost.classList.add('ghost');
+    ghost.style.width = r.width + 'px';
+    document.body.appendChild(ghost);
+    const ph = document.createElement('div'); ph.className = 'ph';
+    li.after(ph); li.hidden = true;
+    drag = { li, ghost, ph, id: st.id, dx: st.x - r.left, dy: st.y - r.top, y };
+    document.body.classList.add('dragging');
+    try { navigator.vibrate && navigator.vibrate(15); } catch (e) {}
+    moveDrag(x, y);
+    scrollTimer = setInterval(() => {
+      if (!drag) return;
+      const fr = formEl.getBoundingClientRect();
+      if (drag.y < fr.top + 60) formEl.scrollTop -= 14;
+      else if (drag.y > fr.bottom - 60) formEl.scrollTop += 14;
+    }, 16);
+  }
+  function moveDrag(x, y) {
+    drag.y = y;
+    drag.ghost.style.left = (x - drag.dx) + 'px'; drag.ghost.style.top = (y - drag.dy) + 'px';
+    const el = document.elementFromPoint(x, y), dl = el && el.closest('#luBoard .dl');
+    document.querySelectorAll('#luBoard .dl.over').forEach(d => d.classList.remove('over'));
+    if (!dl) return;
+    dl.classList.add('over');
+    const items = [...dl.querySelectorAll('.li')].filter(n => !n.hidden);
+    const before = items.find(n => { const r = n.getBoundingClientRect(); return y < r.top + r.height / 2; });
+    const emp = dl.querySelector('.empty'); if (emp) emp.hidden = true;
+    if (before) dl.insertBefore(drag.ph, before); else dl.appendChild(drag.ph);
+  }
+  function endDrag(cancel) {
+    const d = drag; drag = null; clearInterval(scrollTimer);
+    document.body.classList.remove('dragging');
+    d.ghost.remove();
+    const dl = d.ph.parentElement;
+    if (!cancel && dl) {
+      const to = dl.dataset.list;
+      const idx = [...dl.children].filter(n => (n.classList.contains('li') && !n.hidden) || n === d.ph).indexOf(d.ph);
+      const from = d.li.dataset.list, i = +d.li.dataset.i;
+      const [nm] = listOf(from).splice(i, 1);
+      listOf(to).splice(idx, 0, nm);
+    }
+    renderBoard();
+  }
+  document.addEventListener('pointermove', e => {
+    if (pend && e.pointerId === pend.id) {
+      const dist = Math.hypot(e.clientX - pend.x, e.clientY - pend.y);
+      if (pend.type === 'mouse') { if (dist > 5) startDrag(e.clientX, e.clientY); }
+      else if (dist > 10) cancelPend();
+    }
+    if (drag && e.pointerId === drag.id) { e.preventDefault(); moveDrag(e.clientX, e.clientY); }
+  });
+  document.addEventListener('pointerup', e => { if (drag && e.pointerId === drag.id) endDrag(false); else cancelPend(); });
+  document.addEventListener('pointercancel', e => { if (drag && e.pointerId === drag.id) endDrag(false); else cancelPend(); });
+  document.addEventListener('touchmove', e => { if (drag) e.preventDefault(); }, { passive: false });
+  $('luBoard').addEventListener('contextmenu', e => { if (e.target.closest('.li')) e.preventDefault(); });
 
   function openSheet() {
-    $('rosterPaste').value = rosterText || $('rosterPaste').value;
-    [0, 1].forEach(i => { $('lu' + i).value = s.lineup[i].join('\n'); $('luLbl' + i).textContent = `${s.names[i]} 타순`; });
-    draftBatters = s.batters; renderRoster();
+    if (rosterText) $('rosterPaste').value = rosterText;
+    draft.L = s.lineup.map(x => x.slice()); draft.B = s.bench.map(x => x.slice());
+    draftBatters = s.batters; draftMode = s.mode || 'intra';
     draftColors = s.colors.slice();
     [0, 1].forEach(i => { $('n' + i).value = s.names[i]; setDraft(i, s.colors[i]); });
+    $('rosterBox').open = false;
+    renderPickers(); renderBoard();
     $('innings').value = s.innings; syncInn(); renderSound();
     resetBtn.classList.remove('armed'); resetBtn.textContent = '새 경기 시작';
-    sheet.hidden = false; $('n0').focus();
+    sheet.hidden = false; formEl.scrollTop = 0;
   }
   const closeSheet = () => { sheet.hidden = true; };
   $('setBtn').onclick = openSheet; $('closeBtn').onclick = closeSheet;
@@ -914,12 +1076,12 @@ thead th.ccol { color: var(--amber); }
     const names = [0, 1].map(i => $('n' + i).value.trim() || s.names[i]);
     const inn = Math.max(1, Math.min(15, parseInt($('innings').value, 10) || s.innings));
     const colors = draftColors.slice();
-    const lineup = [0, 1].map(i => $('lu' + i).value.split(/\r?\n/).map(cleanName).filter(Boolean));
+    const lineup = draft.L.map(x => x.slice()), bench = draft.B.map(x => x.slice()), mode = draftMode;
     const batters = draftBatters;
     try { rosterText = $('rosterPaste').value; localStorage.setItem(RKEY, rosterText); } catch (e) {}
     commit(() => {
       const changed = JSON.stringify(lineup) !== JSON.stringify(s.lineup) || batters !== s.batters;
-      s.names = names; s.colors = colors; s.innings = inn; s.lineup = lineup; s.batters = batters;
+      s.names = names; s.colors = colors; s.innings = inn; s.lineup = lineup; s.bench = bench; s.mode = mode; s.batters = batters;
       if (changed) { s.bat = [0, 0]; s.done = []; s.halfDone = false; }
       s.last = `<b>설정 변경</b> · ${inn}이닝 · 타순 ${batN(0)}명 / ${batN(1)}명${changed ? ' · 타순을 1번부터 시작합니다' : ''}`;
       return 'tick';
