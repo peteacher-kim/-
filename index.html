@@ -377,6 +377,16 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
         <label id="pickLbl1">홈 반</label>
         <div class="presets ko" id="classList1"></div>
         <p class="note">반 대항은 <b>1회 여자 · 2회 남자 · 3회 혼성</b>으로 진행돼요 (연장은 혼성). 처음 한 번만 대기 칸의 학생마다 <b>여 / 남</b>을 눌러 나눠 두면 다음부터는 그 반을 고를 때 그대로 불러와요. 명단 줄 끝에 '여' '남'을 적어 두면 자동으로 나뉩니다.</p>
+        <details id="interImport">
+          <summary>반 대항 타순 미리 저장하기 · 다른 기기로 옮기기</summary>
+          <textarea id="interPaste" rows="8" placeholder="2반 여자&#10;김OO&#10;이OO&#10;2반 남자&#10;박OO&#10;2반 혼성&#10;김OO&#10;박OO"></textarea>
+          <p class="note">'2반 여자', '2반 남자', '2반 혼성' 줄 아래에 타순대로 한 줄에 한 명씩 적고 <b>저장</b>을 누르세요. 여러 반을 한 번에 넣어도 돼요. 저장한 타순은 반을 고르면 바로 불러와집니다.</p>
+          <div class="row">
+            <button class="tbtn" type="button" id="interExport">저장된 타순 꺼내기</button>
+            <button class="primary" type="button" id="interSave">타순 저장</button>
+          </div>
+          <p class="note" id="interMsg" aria-live="polite"></p>
+        </details>
       </div>
       <label>팀 인원 · 혼성 타순 자동 채우기 인원, 명단이 없을 때 타자 수</label>
       <div class="presets" id="batPresets"></div>
@@ -938,18 +948,24 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   const SPLITS = [['oddeven', '번호 홀수 · 짝수'], ['half', '앞 · 뒤 절반'], ['random', '무작위']];
   $('splitWays').innerHTML = SPLITS.map(([k, nm]) => `<button type="button" data-k="${k}">${nm}</button>`).join('');
   $('batPresets').innerHTML = [8, 9].map(n => `<button type="button" data-n="${n}">${n}명</button>`).join('');
-  const classBtns = (sel) => {
-    const g = groups();
-    return g.length ? g.map(x => `<button type="button" data-c="${esc(x.name)}" aria-pressed="${x.name === sel}">${esc(x.name)} · ${x.list.length}명</button>`).join('')
-      : '<span class="note">위 \'학급 명단 붙여넣기\'에 명단을 넣으면 반 목록이 나타나요.</span>';
+  const classSort = (a, b) => (parseInt(a, 10) || 99) - (parseInt(b, 10) || 99) || a.localeCompare(b);
+  const classBtns = (sel, withSaved) => {
+    const g = groups(), names = g.map(x => x.name);
+    if (withSaved) Object.keys(gmeta).forEach(c => { if (!names.includes(c)) names.push(c); });
+    names.sort(classSort);
+    if (!names.length) return '<span class="note">위 \'학급 명단 붙여넣기\'에 명단을 넣으면 반 목록이 나타나요.</span>';
+    return names.map(c => {
+      const grp = g.find(x => x.name === c), saved = withSaved && gmeta[c] && ((gmeta[c].F || []).length || (gmeta[c].M || []).length);
+      return `<button type="button" data-c="${esc(c)}" aria-pressed="${c === sel}">${esc(c)}${grp ? ` · ${grp.list.length}명` : ''}${saved ? ' ✓' : ''}</button>`;
+    }).join('');
   };
   function renderPickers() {
     $('modeSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.m === draftMode)));
     $('intraPick').hidden = draftMode !== 'intra';
     $('interPick').hidden = draftMode !== 'inter';
     $('classList').innerHTML = classBtns(picked.intra);
-    $('classList0').innerHTML = classBtns(picked.inter[0]);
-    $('classList1').innerHTML = classBtns(picked.inter[1]);
+    $('classList0').innerHTML = classBtns(picked.inter[0], true);
+    $('classList1').innerHTML = classBtns(picked.inter[1], true);
     $('splitWays').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === splitWay)));
     $('batPresets').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.n === draftBatters)));
     if (!groups().length) $('rosterBox').open = true;
@@ -966,10 +982,11 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     renderBoard();
   }
   function fillInter(t) {
-    const g = groups().find(x => x.name === picked.inter[t]); if (!g) return;
-    const names = g.list.map(x => x.name), has = n => names.includes(n), meta = gmeta[g.name];
+    const c = picked.inter[t], g = groups().find(x => x.name === c) || { name: c, list: [] }, meta = gmeta[c];
+    if (!g.list.length && !meta) return;
+    const names = g.list.map(x => x.name);
     const d = draft[t];
-    if (meta) { d.F = (meta.F || []).filter(has); d.M = (meta.M || []).filter(has); d.X = (meta.X || []).filter(has); }
+    if (meta) { d.F = (meta.F || []).slice(); d.M = (meta.M || []).slice(); d.X = (meta.X || []).slice(); }
     else {
       d.F = g.list.filter(x => x.g === 'F').map(x => x.name); d.M = g.list.filter(x => x.g === 'M').map(x => x.name);
       d.X = interleave(d.F, d.M, draftBatters);
@@ -989,6 +1006,39 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   $('splitWays').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; splitWay = b.dataset.k; renderPickers(); if (picked.intra) fillIntra(); });
   $('batPresets').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; draftBatters = +b.dataset.n; renderPickers(); renderBoard(); });
   [0, 1].forEach(i => $('n' + i).addEventListener('input', renderBoard));
+
+  // Pre-saved class-match lineups: "2반 여자" / "2반 남자" / "2반 혼성" headers, one name per line
+  const KMAP = { 여자: 'F', 여: 'F', 남자: 'M', 남: 'M', 혼성: 'X', 혼: 'X' };
+  function importInter(text) {
+    const got = {}; let cur = null;
+    text.split(/\r?\n/).forEach(raw => {
+      const l = raw.replace(/\t/g, ' ').trim(); if (!l) return;
+      const m = l.match(/^(.{1,12}?반)\s*[·:\-]?\s*(여자|남자|혼성|여|남|혼)\s*(타순)?\s*:?$/);
+      if (m) { const c = m[1].replace(/\s/g, ''); got[c] = got[c] || {}; cur = got[c][KMAP[m[2]]] = []; return; }
+      const nm = cleanName(l); if (nm && cur) cur.push(nm);
+    });
+    return got;
+  }
+  function exportInter() {
+    return Object.keys(gmeta).sort(classSort).map(c => ['F', 'M', 'X'].map(k =>
+      `${c} ${KIND[k]}\n${(gmeta[c][k] || []).join('\n')}`).join('\n\n')).join('\n\n');
+  }
+  $('interSave').onclick = () => {
+    const got = importInter($('interPaste').value), cls = Object.keys(got);
+    if (!cls.length) { $('interMsg').textContent = "'2반 여자'처럼 반 이름과 여자·남자·혼성이 적힌 줄을 찾지 못했어요. 형식을 확인해 주세요."; return; }
+    cls.forEach(c => { gmeta[c] = Object.assign({ F: [], M: [], X: [] }, gmeta[c] || {}, got[c]); });
+    try { localStorage.setItem(GKEY, JSON.stringify(gmeta)); } catch (e) {}
+    $('interMsg').textContent = '저장했어요 · ' + cls.sort(classSort).map(c => `${c} 여 ${gmeta[c].F.length} · 남 ${gmeta[c].M.length} · 혼 ${gmeta[c].X.length}`).join(' / ');
+    [0, 1].forEach(t => { if (cls.includes(picked.inter[t])) fillInter(t); });
+    renderPickers();
+  };
+  $('interExport').onclick = async () => {
+    const txt = exportInter();
+    $('interPaste').value = txt;
+    if (!txt) { $('interMsg').textContent = '아직 저장된 반 대항 타순이 없어요.'; return; }
+    try { await navigator.clipboard.writeText(txt); $('interMsg').textContent = '저장된 타순을 칸에 꺼내고 복사했어요. 다른 기기의 같은 칸에 붙여넣고 저장하면 옮겨져요.'; }
+    catch (e) { $('interPaste').select(); $('interMsg').textContent = '저장된 타순을 칸에 꺼냈어요. 전체 선택해서 복사한 뒤 다른 기기에 붙여넣으세요.'; }
+  };
 
   // Drop lists are keyed "<team><kind>": L 타순(반 안), F 여자, M 남자, X 혼성, B 대기
   const listOf = key => draft[+key[0]][key[1]];
