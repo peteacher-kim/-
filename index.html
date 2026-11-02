@@ -172,6 +172,8 @@ button:disabled { opacity: .35; cursor: not-allowed; }
 .act.strike { --k: var(--lamp-s); }
 .act.out { --k: var(--lamp-o); }
 .act.safe { --k: var(--lamp-b); }
+.act.hit { --k: #5cc8ff; }
+.act.span2 { grid-column: span 2; }
 .act.change.ready { --k: var(--amber); border-width: 3px; animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 50% { background: color-mix(in srgb, var(--amber) 42%, var(--board-2)); } }
 .act.run { --k: var(--amber); background: var(--amber); color: #1d1600; }
@@ -315,9 +317,11 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     <button class="act strike" type="button" data-a="strike">스트라이크<small>S</small></button>
     <button class="act out" type="button" data-a="out">아웃<small>O</small></button>
     <button class="act safe" type="button" data-a="safe">세이프<small>H</small></button>
+    <button class="act hit" type="button" data-a="single">안타<small>A</small></button>
+    <button class="act hit" type="button" data-a="double">2루타<small>D</small></button>
     <button class="act run" type="button" data-a="run">득점 +1<small>R</small></button>
     <button class="act minor" type="button" data-a="runMinus">득점 −1</button>
-    <button class="act minor change" type="button" data-a="change" id="changeBtn">공수 교대<small>C</small></button>
+    <button class="act minor change span2" type="button" data-a="change" id="changeBtn">공수 교대<small>C</small></button>
     <button class="act read" type="button" id="readBtn">스코어 읽어주기<small>V</small></button>
   </section>
 
@@ -326,7 +330,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   </section>
 </main>
 
-<footer class="hint">키보드: S 스트라이크 · O 아웃 · H 세이프 · R 득점 · C 공수 교대 · 1·2·3 주자 · V 스코어 읽기 · Z 되돌리기 · M 소리</footer>
+<footer class="hint">키보드: S 스트라이크 · O 아웃 · H 세이프 · A 안타 · D 2루타 · R 득점 · C 공수 교대 · 1·2·3 주자 · V 스코어 읽기 · Z 되돌리기 · M 소리</footer>
 
 <div class="sheet-wrap" id="finalWrap" hidden>
   <div class="sheet final">
@@ -653,6 +657,20 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     else { s.half = 0; s.inning++; s.line[0][s.inning - 1] = s.line[0][s.inning - 1] || 0; }
     if (inter()) s.bat = [0, 0];
   }
+  // 안타 = 모든 주자 1베이스, 2루타 = 2베이스 진루 (최대 2베이스). 홈을 밟은 주자는 자동 득점
+  function hitBy(n) {
+    if (s.halfDone) return null;
+    const t = s.half, who = batterLabel(t, s.bat[t] % batN(t));
+    const nb = [false, false, false]; let runs = 0;
+    for (let i = 2; i >= 0; i--) if (s.bases[i]) { const d = i + n; if (d >= 3) runs++; else nb[d] = true; }
+    nb[n - 1] = true; s.bases = nb;
+    if (runs) addRun(runs);
+    const kind = n === 1 ? '안타' : '2루타';
+    s.last = `<b>${kind}</b> · ${esc(who)} ${n}루${runs ? ` · <b>${runs}점 득점</b> ${total(0)} : ${total(1)}` : ''}`;
+    say = `${kind}!`;
+    finishBatter();
+    return s.over ? 'win' : runs ? 'run' : 'hit';
+  }
   // 전원타격제: a batter's turn ends with out or safe; the half ends when everyone has batted
   function finishBatter() {
     const t = s.half, n = batN(t), cur = s.bat[t] % n;
@@ -682,6 +700,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
       s.last = `<b>스트라이크</b> · ${s.strikes}스트라이크`; say = `${KO_N[s.strikes]} 스트라이크!`; return 'strike';
     },
     out() { if (s.halfDone) return null; return doOut('아웃'); },
+    single() { return hitBy(1); },
+    double() { return hitBy(2); },
     safe() {
       if (s.halfDone) return null;
       s.last = `<b>세이프</b> · ${esc(batterLabel(s.half, s.bat[s.half] % batN(s.half)))} 출루`;
@@ -779,7 +799,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     document.querySelectorAll('.base').forEach(b => b.setAttribute('aria-pressed', String(!!s.bases[+b.dataset.b])));
     document.querySelectorAll('.ctrls [data-a]').forEach(b => {
       const a = b.dataset.a;
-      b.disabled = (s.over && a !== 'runMinus') || (s.halfDone && ['strike', 'out', 'safe'].includes(a));
+      b.disabled = (s.over && a !== 'runMinus') || (s.halfDone && ['strike', 'out', 'safe', 'single', 'double'].includes(a));
     });
     $('changeBtn').classList.toggle('ready', s.halfDone && !s.over);
     renderBatting();
@@ -1239,7 +1259,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     try { if (document.fullscreenElement) document.exitFullscreen?.(); else document.documentElement.requestFullscreen?.().catch(() => {}); } catch (e) {}
   };
   document.addEventListener('fullscreenchange', () => { $('fsBtn').textContent = document.fullscreenElement ? '창 모드' : '전체화면'; });
-  const KEYS = { s: 'strike', o: 'out', h: 'safe', r: 'run', c: 'change' };
+  const KEYS = { s: 'strike', o: 'out', h: 'safe', a: 'single', d: 'double', r: 'run', c: 'change' };
   document.addEventListener('keydown', e => {
     if (!sheet.hidden) { if (e.key === 'Escape') closeSheet(); return; }
     if (e.target.closest('input, textarea') || e.metaKey || e.ctrlKey || e.altKey) return;
