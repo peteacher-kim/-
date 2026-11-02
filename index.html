@@ -221,6 +221,7 @@ details textarea { box-sizing: border-box; max-width: 100%; }
 .col { display: grid; gap: 6px; align-content: start; min-width: 0; }
 .colhead { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: .9rem; min-width: 0; }
 .colhead i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.colhead .autosave { margin-left: auto; flex: none; font-size: .72rem; font-weight: 600; color: var(--lamp-b); }
 .colhead span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cnt { margin-left: auto; flex: none; font-family: var(--f-num); font-size: .8rem; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--fg); }
 .cnt.warn { color: var(--lamp-o); border-color: var(--lamp-o); }
@@ -376,11 +377,11 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
         <div class="presets ko" id="classList0"></div>
         <label id="pickLbl1">홈 반</label>
         <div class="presets ko" id="classList1"></div>
-        <p class="note">반 대항은 <b>1회 여자 · 2회 남자 · 3회 혼성</b>으로 진행돼요 (연장은 혼성). 처음 한 번만 대기 칸의 학생마다 <b>여 / 남</b>을 눌러 나눠 두면 다음부터는 그 반을 고를 때 그대로 불러와요. 명단 줄 끝에 '여' '남'을 적어 두면 자동으로 나뉩니다.</p>
+        <p class="note">반 대항은 <b>1회 여자 · 2회 남자 · 3회 혼성</b>으로 진행돼요 (연장은 혼성).<br><b>미리 정리해 두기:</b> 원정 반 자리에서 반을 하나 고르고 아래에서 끌어 옮겨 타순을 만드세요. 옮기는 즉시 그 반 타순으로 <b>자동 저장</b>돼요. 다음 반을 고르고 똑같이 하면 됩니다. 정리가 끝나면 <b>닫기</b>를 눌러도 저장은 남아 있고, 경기 날 원정·홈 반만 고르면 바로 불러와요.</p>
         <details id="interImport">
-          <summary>반 대항 타순 미리 저장하기 · 다른 기기로 옮기기</summary>
+          <summary>다른 기기로 옮기기 · 글로 붙여넣기</summary>
           <textarea id="interPaste" rows="8" placeholder="2반 여자&#10;김OO&#10;이OO&#10;2반 남자&#10;박OO&#10;2반 혼성&#10;김OO&#10;박OO"></textarea>
-          <p class="note">'2반 여자', '2반 남자', '2반 혼성' 줄 아래에 타순대로 한 줄에 한 명씩 적고 <b>저장</b>을 누르세요. 여러 반을 한 번에 넣어도 돼요. 저장한 타순은 반을 고르면 바로 불러와집니다.</p>
+          <p class="note">이 기기에 정리해 둔 타순을 <b>저장된 타순 꺼내기</b>로 복사해서, 다른 기기의 이 칸에 붙여넣고 <b>타순 저장</b>을 누르면 옮겨져요.</p>
           <div class="row">
             <button class="tbtn" type="button" id="interExport">저장된 타순 꺼내기</button>
             <button class="primary" type="button" id="interSave">타순 저장</button>
@@ -993,7 +994,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     }
     d.B = names.filter(n => !d.F.includes(n) && !d.M.includes(n));
     $('n' + t).value = g.name;
-    renderBoard();
+    persistInter(); renderBoard(); renderPickers();
   }
   $('rosterPaste').addEventListener('input', () => { try { localStorage.setItem(RKEY, $('rosterPaste').value); } catch (e) {} renderPickers(); });
   $('modeSeg').addEventListener('click', e => {
@@ -1007,6 +1008,12 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   $('batPresets').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; draftBatters = +b.dataset.n; renderPickers(); renderBoard(); });
   [0, 1].forEach(i => $('n' + i).addEventListener('input', renderBoard));
 
+  function persistInter() {
+    if (draftMode !== 'inter') return;
+    let any = false;
+    [0, 1].forEach(t => { const c = picked.inter[t]; if (c) { const d = draft[t]; gmeta[c] = { F: d.F.slice(), M: d.M.slice(), X: d.X.slice() }; any = true; } });
+    if (any) { try { localStorage.setItem(GKEY, JSON.stringify(gmeta)); } catch (e) {} }
+  }
   // Pre-saved class-match lineups: "2반 여자" / "2반 남자" / "2반 혼성" headers, one name per line
   const KMAP = { 여자: 'F', 여: 'F', 남자: 'M', 남: 'M', 혼성: 'X', 혼: 'X' };
   function importInter(text) {
@@ -1062,7 +1069,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   function renderBoard() {
     $('luBoard').innerHTML = [0, 1].map(t => {
       const nm = ($('n' + t).value || '').trim() || s.names[t];
-      const head = `<div class="colhead"><i style="background:${draftColors[t] || s.colors[t]}"></i><span>${esc(nm)}</span></div>`;
+      const saved = draftMode === 'inter' && picked.inter[t] ? '<span class="autosave">✓ 자동 저장</span>' : '';
+      const head = `<div class="colhead"><i style="background:${draftColors[t] || s.colors[t]}"></i><span>${esc(nm)}</span>${saved}</div>`;
       if (draftMode === 'inter') return `<div class="col">${head}
         ${section(t, 'F', '1회 · 여자 타순', '대기에서 \'여\'를 누르거나 끌어오세요')}
         ${section(t, 'M', '2회 · 남자 타순', '대기에서 \'남\'을 누르거나 끌어오세요')}
@@ -1090,10 +1098,10 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   }
   $('luBoard').addEventListener('click', e => {
     const fill = e.target.closest('[data-fill]');
-    if (fill) { const d = draft[+fill.dataset.fill]; d.X = interleave(d.F, d.M, draftBatters); renderBoard(); return; }
+    if (fill) { const d = draft[+fill.dataset.fill]; d.X = interleave(d.F, d.M, draftBatters); persistInter(); renderBoard(); return; }
     const mv = e.target.closest('.mv'); if (!mv) return;
     const li = mv.closest('.li');
-    moveItem(li.dataset.list, +li.dataset.i, mv.dataset.to, null); renderBoard();
+    moveItem(li.dataset.list, +li.dataset.i, mv.dataset.to, null); persistInter(); renderBoard();
   });
 
   // Drag: mouse drags right away; touch needs a long press so normal scrolling still works
@@ -1148,6 +1156,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     if (!cancel && dl) {
       const idx = [...dl.children].filter(n => (n.classList.contains('li') && !n.hidden) || n === d.ph).indexOf(d.ph);
       moveItem(d.li.dataset.list, +d.li.dataset.i, dl.dataset.list, idx);
+      persistInter();
     }
     renderBoard();
   }
@@ -1169,6 +1178,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     draft = [0, 1].map(t => ({ L: s.lineup[t].slice(), B: s.bench[t].slice(), F: s.sets[t].F.slice(), M: s.sets[t].M.slice(), X: s.sets[t].X.slice() }));
     draftBatters = s.batters; draftMode = s.mode || 'intra';
     draftColors = s.colors.slice();
+    const known = groups().map(g => g.name).concat(Object.keys(gmeta));
+    picked.inter = [0, 1].map(t => draftMode === 'inter' && known.includes(s.names[t]) ? s.names[t] : '');
     [0, 1].forEach(i => { $('n' + i).value = s.names[i]; setDraft(i, s.colors[i]); });
     $('rosterBox').open = false;
     renderPickers(); renderBoard();
