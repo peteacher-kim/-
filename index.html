@@ -211,7 +211,7 @@ thead th.ccol { color: var(--amber); }
 .field input[type=number], .teamset input:not([type=color]) { font: inherit; font-size: 1rem; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%; }
 .field textarea { font: inherit; font-size: .95rem; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%; resize: vertical; user-select: text; }
 .sheet.wide { width: min(820px, 100%); }
-.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--bg); padding: 4px; border-radius: 12px; border: 1px solid var(--line); }
+.seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; background: var(--bg); padding: 4px; border-radius: 12px; border: 1px solid var(--line); }
 .seg button { border: 0; background: transparent; border-radius: 9px; min-height: 44px; font-weight: 600; color: var(--muted); }
 .seg button[aria-pressed="true"] { background: var(--amber); color: #1d1600; }
 details { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: var(--bg); }
@@ -364,6 +364,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
       <div class="seg" id="modeSeg" role="group" aria-label="경기 방식">
         <button type="button" data-m="intra">반 안에서 경기</button>
         <button type="button" data-m="inter">반 대항 경기</button>
+        <button type="button" data-m="practice">반 대항 연습</button>
       </div>
       <details id="interImport">
         <summary>다른 기기로 옮기기 · 명단과 타순 한 번에</summary>
@@ -383,7 +384,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
       <div id="intraPick" class="field">
         <label>반 고르기 · 한 반을 두 팀으로 나눠요</label>
         <div class="presets ko" id="classList"></div>
-        <label>팀 나누는 방법</label>
+        <label>팀 나누는 방법 · 누를 때마다 새로 짜요</label>
         <div class="presets ko" id="splitWays"></div>
       </div>
       <div id="interPick" class="field" hidden>
@@ -391,7 +392,12 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
         <div class="presets ko" id="classList0"></div>
         <label id="pickLbl1">홈 반</label>
         <div class="presets ko" id="classList1"></div>
-        <p class="note">반 대항은 <b>1회 여자 · 2회 남자 · 3회 혼성</b>으로 진행돼요 (연장은 혼성).<br><b>미리 정리해 두기:</b> 원정 반 자리에서 반을 하나 고르고 아래에서 끌어 옮겨 타순을 만드세요. 옮기는 즉시 그 반 타순으로 <b>자동 저장</b>돼요. 다음 반을 고르고 똑같이 하면 됩니다. 정리가 끝나면 <b>닫기</b>를 눌러도 저장은 남아 있고, 경기 날 원정·홈 반만 고르면 바로 불러와요.</p>
+        <div id="practiceWays" class="field" hidden>
+          <label>연습 타순 정하는 방법 · 누를 때마다 새로 짜요</label>
+          <div class="presets ko" id="practiceList"></div>
+          <p class="note">원정·홈 반을 고르면 1회 여자 · 2회 남자 · 3회 혼성 타순을 자동으로 짜요. 9명이 넘는 쪽은 빠진 학생이 혼성 타순에 먼저 들어가서 모두 한 번은 타석에 서요. 짠 뒤에도 끌어서 고칠 수 있어요.</p>
+        </div>
+        <p class="note" id="interNote">반 대항은 <b>1회 여자 · 2회 남자 · 3회 혼성</b>으로 진행돼요 (연장은 혼성).<br><b>미리 정리해 두기:</b> 원정 반 자리에서 반을 하나 고르고 아래에서 끌어 옮겨 타순을 만드세요. 옮기는 즉시 그 반 타순으로 <b>자동 저장</b>돼요. 다음 반을 고르고 똑같이 하면 됩니다. 정리가 끝나면 <b>닫기</b>를 눌러도 저장은 남아 있고, 경기 날 원정·홈 반만 고르면 바로 불러와요.</p>
       </div>
       <label>팀 인원 · 혼성 타순 자동 채우기 인원, 명단이 없을 때 타자 수</label>
       <div class="presets" id="batPresets"></div>
@@ -465,7 +471,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   // 반 대항: 1회 여자 · 2회 남자 · 3회 혼성 (연장은 혼성)
   const SCHED = ['F', 'M', 'X'], KIND = { F: '여자', M: '남자', X: '혼성' };
   const kindAt = i => i <= SCHED.length ? SCHED[i - 1] : 'X';
-  const inter = () => s.mode === 'inter';
+  const inter = () => s.mode === 'inter' || s.mode === 'practice';
   const order = t => {
     const list = inter() ? (s.sets[t] && s.sets[t][kindAt(s.inning)]) || [] : s.lineup[t] || [];
     return list.length ? list : Array.from({ length: s.batters }, () => '');
@@ -477,7 +483,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   const $ = id => document.getElementById(id);
   const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const total = t => s.line[t].reduce((a, b) => a + (b || 0), 0);
-  const inningLabel = () => `${s.inning}회 ${s.half ? '말' : '초'}${s.mode === 'inter' ? ' · ' + KIND[kindAt(s.inning)] : ''}`;
+  const inningLabel = () => `${s.inning}회 ${s.half ? '말' : '초'}${inter() ? ' · ' + KIND[kindAt(s.inning)] : ''}`;
 
   // ---------- Sound (synthesized, no files) ----------
   let prefs = { on: true, vol: 70, run: 'random', voice: true, rate: 1.15, pitch: 1.8, voiceName: '', v2: true };
@@ -944,7 +950,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   }
   // ---------- Roster & batting order (device-only storage) ----------
   const RKEY = 'baseball-roster-v1', GKEY = 'baseball-gender-v1';
-  let rosterText = '', splitWay = 'oddeven', draftBatters = 9, draftMode = 'intra';
+  let rosterText = '', splitWay = 'avg', practiceWay = 'avg', draftBatters = 9, draftMode = 'intra';
   let picked = { intra: '', inter: ['', ''] };
   const emptyTeam = () => ({ L: [], B: [], F: [], M: [], X: [] });
   let draft = [emptyTeam(), emptyTeam()];
@@ -958,15 +964,23 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
       const l = raw.replace(/\t/g, ' ').trim(); if (!l) return;
       const m = l.match(/^(\d+\s*반)\s*$/) || l.match(/^(.{1,12}반)\s*$/);
       if (m) { cur = { name: m[1].replace(/\s/g, ''), list: [] }; groups.push(cur); return; }
-      const gm = l.match(GTOK), g = gm ? (/^(여|여자|女|F)$/i.test(gm[1]) ? 'F' : 'M') : '';
-      const nm = cleanName(l); if (!nm) return;
+      let line = l, avg = null;
+      const am = line.match(/\s+(0?\.\d+|1(?:\.0+)?)$/); if (am) { avg = parseFloat(am[1]); line = line.slice(0, am.index); }
+      const gm = line.match(GTOK), idm = line.match(/^(\d{4,5})\b/);
+      let g = gm ? (/^(여|여자|女|F)$/i.test(gm[1]) ? 'F' : 'M') : '';
+      if (!g && idm) g = (+idm[1] % 100) <= 20 ? 'F' : 'M';   // 학번 01~20 여학생, 21~ 남학생
+      const nm = cleanName(line); if (!nm) return;
       if (!cur) { cur = { name: '명단', list: [] }; groups.push(cur); }
-      cur.list.push({ name: nm, g });
+      cur.list.push({ name: nm, g, avg, id: idm ? +idm[1] : 0 });
     });
     return groups.filter(g => g.list.length);
   }
   const groups = () => parseRoster($('rosterPaste').value);
-  const SPLITS = [['oddeven', '번호 홀수 · 짝수'], ['half', '앞 · 뒤 절반'], ['random', '무작위']];
+  const SPLITS = [['avg', '타율 참고'], ['random', '무작위']];
+  $('practiceList').innerHTML = SPLITS.map(([k, nm]) => `<button type="button" data-k="${k}">${nm}</button>`).join('');
+  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const byAvg = a => a.slice().sort((x, y) => (y.avg ?? -1) - (x.avg ?? -1) || x.id - y.id);
+  const hasAvg = g => g.list.some(x => x.avg != null);
   $('splitWays').innerHTML = SPLITS.map(([k, nm]) => `<button type="button" data-k="${k}">${nm}</button>`).join('');
   $('batPresets').innerHTML = [8, 9].map(n => `<button type="button" data-n="${n}">${n}명</button>`).join('');
   const classSort = (a, b) => (parseInt(a, 10) || 99) - (parseInt(b, 10) || 99) || a.localeCompare(b);
@@ -983,10 +997,14 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   function renderPickers() {
     $('modeSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.m === draftMode)));
     $('intraPick').hidden = draftMode !== 'intra';
-    $('interPick').hidden = draftMode !== 'inter';
+    const im = draftMode === 'inter' || draftMode === 'practice';
+    $('interPick').hidden = !im;
+    $('practiceWays').hidden = draftMode !== 'practice';
+    $('interNote').hidden = draftMode !== 'inter';
+    $('practiceList').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === practiceWay)));
     $('classList').innerHTML = classBtns(picked.intra);
-    $('classList0').innerHTML = classBtns(picked.inter[0], true);
-    $('classList1').innerHTML = classBtns(picked.inter[1], true);
+    $('classList0').innerHTML = classBtns(picked.inter[0], draftMode === 'inter');
+    $('classList1').innerHTML = classBtns(picked.inter[1], draftMode === 'inter');
     $('splitWays').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === splitWay)));
     $('batPresets').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.n === draftBatters)));
     if (!groups().length) $('rosterBox').open = true;
@@ -994,15 +1012,35 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   const interleave = (f, m, n) => { const out = []; for (let i = 0; out.length < n && (i < f.length || i < m.length); i++) { if (i < f.length && out.length < n) out.push(f[i]); if (i < m.length && out.length < n) out.push(m[i]); } return out; };
   function fillIntra() {
     const g = groups().find(x => x.name === picked.intra); if (!g) return;
-    let list = g.list.map(x => x.name), a = [], b = [];
-    if (splitWay === 'random') { for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; } }
-    if (splitWay === 'oddeven') list.forEach((nm, i) => (i % 2 ? b : a).push(nm));
-    else { const k = Math.ceil(list.length / 2); a = list.slice(0, k); b = list.slice(k); }
-    draft[0].L = a; draft[1].L = b; draft[0].B = []; draft[1].B = [];
+    let A = [], B = [];
+    if (splitWay === 'avg') {
+      // 타율 순으로 뱀 모양(1·2·2·1…) 배분 → 두 팀 실력이 고르게, 팀 안에서는 타율 높은 순
+      byAvg(g.list).forEach((x, i) => ((i % 4 === 0 || i % 4 === 3) ? A : B).push(x));
+      A = byAvg(A); B = byAvg(B);
+    } else {
+      const l = shuffle(g.list), k = Math.ceil(l.length / 2); A = l.slice(0, k); B = l.slice(k);
+    }
+    draft[0].L = A.map(x => x.name); draft[1].L = B.map(x => x.name); draft[0].B = []; draft[1].B = [];
     $('n0').value = `${g.name} 1팀`; $('n1').value = `${g.name} 2팀`;
     renderBoard();
   }
+  function fillPractice(t) {
+    const c = picked.inter[t], g = groups().find(x => x.name === c); if (!g) return;
+    const n = draftBatters, order = practiceWay === 'avg' ? byAvg : shuffle;
+    const F = order(g.list.filter(x => x.g === 'F')), M = order(g.list.filter(x => x.g === 'M'));
+    const Fl = F.slice(0, n), Ml = M.slice(0, n), Fx = F.slice(n), Mx = M.slice(n);
+    // 혼성: 1·2회에 빠진 학생 먼저, 나머지는 여·남 번갈아
+    const fq = Fx.concat(Fl), mq = Mx.concat(Ml), X = [];
+    const fFirst = practiceWay !== 'avg' || (F[0] && M[0] ? (F[0].avg ?? 0) >= (M[0].avg ?? 0) : !!F[0]);
+    while (X.length < n && (fq.length || mq.length)) for (const q of (fFirst ? [fq, mq] : [mq, fq])) if (q.length && X.length < n) X.push(q.shift());
+    const d = draft[t];
+    d.F = Fl.map(x => x.name); d.M = Ml.map(x => x.name); d.X = X.map(x => x.name);
+    d.B = Fx.concat(Mx).map(x => x.name);
+    $('n' + t).value = g.name;
+    renderBoard(); renderPickers();
+  }
   function fillInter(t) {
+    if (draftMode === 'practice') return fillPractice(t);
     const c = picked.inter[t], g = groups().find(x => x.name === c) || { name: c, list: [] }, meta = gmeta[c];
     if (!g.list.length && !meta) return;
     const names = g.list.map(x => x.name);
@@ -1019,11 +1057,13 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   $('rosterPaste').addEventListener('input', () => { try { localStorage.setItem(RKEY, $('rosterPaste').value); } catch (e) {} renderPickers(); });
   $('modeSeg').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return; draftMode = b.dataset.m;
-    if (draftMode === 'inter' && +$('innings').value !== 3) { $('innings').value = 3; syncInn(); }
+    if (draftMode !== 'intra' && +$('innings').value !== 3) { $('innings').value = 3; syncInn(); }
+    if (draftMode === 'practice') [0, 1].forEach(t => picked.inter[t] && fillPractice(t));
     renderPickers(); renderBoard();
   });
   $('classList').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; picked.intra = b.dataset.c; renderPickers(); fillIntra(); });
   [0, 1].forEach(t => $('classList' + t).addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; picked.inter[t] = b.dataset.c; renderPickers(); fillInter(t); }));
+  $('practiceList').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; practiceWay = b.dataset.k; renderPickers(); [0, 1].forEach(t => picked.inter[t] && fillPractice(t)); });
   $('splitWays').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; splitWay = b.dataset.k; renderPickers(); if (picked.intra) fillIntra(); });
   $('batPresets').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; draftBatters = +b.dataset.n; renderPickers(); renderBoard(); });
   [0, 1].forEach(i => $('n' + i).addEventListener('input', renderBoard));
@@ -1085,7 +1125,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   function itemHTML(key, i, nm) {
     const t = key[0], k = key[1];
     let btns;
-    if (k === 'B') btns = draftMode === 'inter'
+    if (k === 'B') btns = draftMode !== 'intra'
       ? `<button type="button" class="mv" data-to="${t}F" aria-label="${esc(nm)} 여자 타순에 넣기">여</button><button type="button" class="mv" data-to="${t}M" aria-label="${esc(nm)} 남자 타순에 넣기">남</button>`
       : `<button type="button" class="mv" data-to="${t}L" aria-label="${esc(nm)} 타순에 넣기">↑ 타순</button>`;
     else if (k === 'X') btns = `<button type="button" class="mv" data-to="drop" aria-label="${esc(nm)} 혼성 타순에서 빼기">빼기 ×</button>`;
@@ -1103,7 +1143,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
       const nm = ($('n' + t).value || '').trim() || s.names[t];
       const saved = draftMode === 'inter' && picked.inter[t] ? '<span class="autosave">✓ 자동 저장</span>' : '';
       const head = `<div class="colhead"><i style="background:${draftColors[t] || s.colors[t]}"></i><span>${esc(nm)}</span>${saved}</div>`;
-      if (draftMode === 'inter') return `<div class="col">${head}
+      if (draftMode !== 'intra') return `<div class="col">${head}
         ${section(t, 'F', '1회 · 여자 타순', '대기에서 \'여\'를 누르거나 끌어오세요')}
         ${section(t, 'M', '2회 · 남자 타순', '대기에서 \'남\'을 누르거나 끌어오세요')}
         ${section(t, 'X', '3회 · 혼성 타순', '여자·남자 타순에서 끌어오면 복사돼요', `<button type="button" class="mini" data-fill="${t}">여·남 번갈아 채우기</button>`)}
@@ -1211,7 +1251,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     draftBatters = s.batters; draftMode = s.mode || 'intra';
     draftColors = s.colors.slice();
     const known = groups().map(g => g.name).concat(Object.keys(gmeta));
-    picked.inter = [0, 1].map(t => draftMode === 'inter' && known.includes(s.names[t]) ? s.names[t] : '');
+    picked.inter = [0, 1].map(t => draftMode !== 'intra' && known.includes(s.names[t]) ? s.names[t] : '');
     [0, 1].forEach(i => { $('n' + i).value = s.names[i]; setDraft(i, s.colors[i]); });
     $('rosterBox').open = false;
     renderPickers(); renderBoard();
@@ -1242,7 +1282,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
       s.names = names; s.colors = colors; s.innings = inn; s.lineup = lineup; s.bench = bench; s.sets = sets; s.mode = mode; s.batters = batters;
       const changed = before !== JSON.stringify([s.lineup, s.sets, s.mode, s.batters]);
       if (changed) { s.bat = [0, 0]; s.done = []; s.halfDone = false; }
-      s.last = `<b>설정 변경</b> · ${inn}이닝 · ${mode === 'inter' ? '반 대항 (1회 여자 · 2회 남자 · 3회 혼성)' : '반 안 경기'}${changed ? ' · 타순을 1번부터 시작합니다' : ''}`;
+      s.last = `<b>설정 변경</b> · ${inn}이닝 · ${mode === 'inter' ? '반 대항 (1회 여자 · 2회 남자 · 3회 혼성)' : mode === 'practice' ? '반 대항 연습 (1회 여자 · 2회 남자 · 3회 혼성)' : '반 안 경기'}${changed ? ' · 타순을 1번부터 시작합니다' : ''}`;
       return 'tick';
     });
     closeSheet();
