@@ -365,6 +365,16 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
         <button type="button" data-m="intra">반 안에서 경기</button>
         <button type="button" data-m="inter">반 대항 경기</button>
       </div>
+      <details id="interImport">
+        <summary>다른 기기로 옮기기 · 명단과 타순 한 번에</summary>
+        <p class="note"><b>보내는 기기:</b> 아래 <b>이 기기 명단·타순 복사</b>를 누른 뒤, 카카오톡 '나와의 채팅' 등으로 받는 기기에 보내세요.<br><b>받는 기기:</b> 받은 글을 아래 칸에 붙여넣고 <b>가져오기</b>를 누르면 학급 명단과 정리해 둔 반 대항 타순이 한 번에 들어와요.</p>
+        <textarea id="interPaste" rows="4" placeholder="여기에 붙여넣기"></textarea>
+        <div class="row">
+          <button class="tbtn" type="button" id="interExport">이 기기 명단·타순 복사</button>
+          <button class="primary" type="button" id="interSave">가져오기</button>
+        </div>
+        <p class="note" id="interMsg" aria-live="polite"></p>
+      </details>
       <details id="rosterBox">
         <summary>학급 명단 붙여넣기 · 수정</summary>
         <textarea id="rosterPaste" rows="5" placeholder="1반&#10;1101 김OO&#10;1102 이OO&#10;2반&#10;1201 박OO"></textarea>
@@ -382,16 +392,6 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
         <label id="pickLbl1">홈 반</label>
         <div class="presets ko" id="classList1"></div>
         <p class="note">반 대항은 <b>1회 여자 · 2회 남자 · 3회 혼성</b>으로 진행돼요 (연장은 혼성).<br><b>미리 정리해 두기:</b> 원정 반 자리에서 반을 하나 고르고 아래에서 끌어 옮겨 타순을 만드세요. 옮기는 즉시 그 반 타순으로 <b>자동 저장</b>돼요. 다음 반을 고르고 똑같이 하면 됩니다. 정리가 끝나면 <b>닫기</b>를 눌러도 저장은 남아 있고, 경기 날 원정·홈 반만 고르면 바로 불러와요.</p>
-        <details id="interImport">
-          <summary>다른 기기로 옮기기 · 글로 붙여넣기</summary>
-          <textarea id="interPaste" rows="8" placeholder="2반 여자&#10;김OO&#10;이OO&#10;2반 남자&#10;박OO&#10;2반 혼성&#10;김OO&#10;박OO"></textarea>
-          <p class="note">이 기기에 정리해 둔 타순을 <b>저장된 타순 꺼내기</b>로 복사해서, 다른 기기의 이 칸에 붙여넣고 <b>타순 저장</b>을 누르면 옮겨져요.</p>
-          <div class="row">
-            <button class="tbtn" type="button" id="interExport">저장된 타순 꺼내기</button>
-            <button class="primary" type="button" id="interSave">타순 저장</button>
-          </div>
-          <p class="note" id="interMsg" aria-live="polite"></p>
-        </details>
       </div>
       <label>팀 인원 · 혼성 타순 자동 채우기 인원, 명단이 없을 때 타자 수</label>
       <div class="presets" id="batPresets"></div>
@@ -1050,9 +1050,20 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     return Object.keys(gmeta).sort(classSort).map(c => ['F', 'M', 'X'].map(k =>
       `${c} ${KIND[k]}\n${(gmeta[c][k] || []).join('\n')}`).join('\n\n')).join('\n\n');
   }
+  const toCode = obj => 'PB1:' + btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+  const fromCode = txt => JSON.parse(decodeURIComponent(escape(atob(txt.trim().slice(4).replace(/\s+/g, '')))));
   $('interSave').onclick = () => {
-    const got = importInter($('interPaste').value), cls = Object.keys(got);
-    if (!cls.length) { $('interMsg').textContent = "'2반 여자'처럼 반 이름과 여자·남자·혼성이 적힌 줄을 찾지 못했어요. 형식을 확인해 주세요."; return; }
+    const raw = $('interPaste').value.trim();
+    if (raw.startsWith('PB1:')) {
+      let data; try { data = fromCode(raw); } catch (e) { $('interMsg').textContent = '붙여넣은 글이 잘렸거나 바뀐 것 같아요. 보내는 기기에서 다시 복사해 주세요.'; return; }
+      if (data.roster) { $('rosterPaste').value = data.roster; rosterText = data.roster; }
+      if (data.lineups) Object.assign(gmeta, data.lineups);
+      try { localStorage.setItem(RKEY, rosterText); localStorage.setItem(GKEY, JSON.stringify(gmeta)); } catch (e) {}
+      $('interMsg').textContent = `가져왔어요 · 학급 ${groups().length}개 · 반 대항 타순 ${Object.keys(data.lineups || {}).length}개 반`;
+      $('interPaste').value = ''; renderPickers(); return;
+    }
+    const got = importInter(raw), cls = Object.keys(got);
+    if (!cls.length) { $('interMsg').textContent = "가져올 내용을 찾지 못했어요. 다른 기기에서 '이 기기 명단·타순 복사'로 만든 글을 그대로 붙여넣어 주세요."; return; }
     cls.forEach(c => { gmeta[c] = Object.assign({ F: [], M: [], X: [] }, gmeta[c] || {}, got[c]); });
     try { localStorage.setItem(GKEY, JSON.stringify(gmeta)); } catch (e) {}
     $('interMsg').textContent = '저장했어요 · ' + cls.sort(classSort).map(c => `${c} 여 ${gmeta[c].F.length} · 남 ${gmeta[c].M.length} · 혼 ${gmeta[c].X.length}`).join(' / ');
@@ -1060,11 +1071,12 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     renderPickers();
   };
   $('interExport').onclick = async () => {
-    const txt = exportInter();
-    $('interPaste').value = txt;
-    if (!txt) { $('interMsg').textContent = '아직 저장된 반 대항 타순이 없어요.'; return; }
-    try { await navigator.clipboard.writeText(txt); $('interMsg').textContent = '저장된 타순을 칸에 꺼내고 복사했어요. 다른 기기의 같은 칸에 붙여넣고 저장하면 옮겨져요.'; }
-    catch (e) { $('interPaste').select(); $('interMsg').textContent = '저장된 타순을 칸에 꺼냈어요. 전체 선택해서 복사한 뒤 다른 기기에 붙여넣으세요.'; }
+    const roster = $('rosterPaste').value || rosterText;
+    if (!roster.trim() && !Object.keys(gmeta).length) { $('interMsg').textContent = '이 기기에는 아직 명단이나 타순이 없어요.'; return; }
+    const code = toCode({ roster, lineups: gmeta });
+    $('interPaste').value = code;
+    try { await navigator.clipboard.writeText(code); $('interMsg').textContent = '복사했어요. 받는 기기로 보내서 그 기기의 이 칸에 붙여넣고 가져오기를 누르세요.'; }
+    catch (e) { $('interPaste').select(); $('interMsg').textContent = '칸에 꺼냈어요. 전체 선택해서 복사한 뒤 받는 기기로 보내세요.'; }
   };
 
   // Drop lists are keyed "<team><kind>": L 타순(반 안), F 여자, M 남자, X 혼성, B 대기
