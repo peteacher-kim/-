@@ -174,6 +174,13 @@ button:disabled { opacity: .35; cursor: not-allowed; }
 .dj-disc { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--amber); border-top-color: transparent; }
 .dj-disc.spin { animation: spin 1s linear infinite; }
 @keyframes spin { 100% { transform: rotate(360deg); } }
+.dj-vol-bar {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--board-2); border: 1px solid var(--line); border-radius: 10px;
+  padding: 6px 12px; font-size: .82rem; font-weight: 600; color: var(--muted);
+}
+.dj-vol-bar input[type=range] { flex: 1; min-width: 80px; accent-color: var(--lamp-b); cursor: pointer; }
+.dj-vol-bar b { font-family: var(--f-num); color: var(--lamp-b); min-width: 3.2ch; text-align: right; }
 .dj-loop {
   background: var(--board-2); border: 1px solid var(--line); color: var(--muted);
   border-radius: 8px; padding: 5px 10px; font-size: .8rem; font-weight: 600; min-height: 34px;
@@ -280,6 +287,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .stepper input { text-align: center; font-family: var(--f-num); font-weight: 700; font-size: 1.2rem; }
 .soundrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .soundrow input[type=range] { flex: 1; min-width: 120px; accent-color: var(--amber); }
+.soundrow .vval { font-family: var(--f-num); font-weight: 700; color: var(--amber); min-width: 3.4ch; text-align: right; font-size: .9rem; }
 .teamset { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
 .teamset-top { display: flex; gap: 10px; align-items: center; }
 .teamset-top .pv { flex: none; width: 40px; height: 40px; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--line); }
@@ -356,6 +364,11 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
       <div class="dj-title"><span class="dj-disc" id="djDisc"></span>DJ 턴테이블 · 응원가 (14곡)</div>
       <button type="button" class="dj-loop on" id="djLoopBtn">🔁 반복 켜짐</button>
       <button type="button" class="dj-stop" id="djStopBtn">⏹ 정지</button>
+    </div>
+    <div class="dj-vol-bar">
+      <span>🎵 응원가 음량</span>
+      <input type="range" id="djVolQuick" min="0" max="100" step="5" aria-label="응원가 음량">
+      <b id="djVolQuickVal">40%</b>
     </div>
     <div class="dj-tracks" id="djTracks"></div>
   </section>
@@ -451,14 +464,22 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
       <div class="teamset" id="ts1"></div>
     </div>
     <div class="field">
-      <label>소리 · 막대는 효과음 및 DJ 응원가 크기</label>
+      <label>소리 전체 스위치 · 효과음 크기</label>
       <div class="soundrow">
         <button class="tbtn" type="button" id="sndToggle">켜짐</button>
-        <input type="range" id="vol" min="0" max="100" step="5" aria-label="음량">
+        <input type="range" id="vol" min="0" max="100" step="5" aria-label="효과음 음량">
+        <span class="vval" id="volVal">70%</span>
       </div>
-      <label>음성 안내 · 스트라이크, 아웃, 공수 교대를 읽어줍니다</label>
+      <label>DJ 턴테이블 응원가 크기 · 교실 수업 방해 방지를 위해 별도 조절</label>
+      <div class="soundrow">
+        <input type="range" id="djVol" min="0" max="100" step="5" aria-label="DJ 응원가 음량">
+        <span class="vval" id="djVolVal">40%</span>
+      </div>
+      <label>경기 안내 음성 크기 · 스트라이크, 아웃, 공수 교대 안내</label>
       <div class="soundrow">
         <button class="tbtn" type="button" id="voiceToggle">켜짐</button>
+        <input type="range" id="voiceVol" min="0" max="100" step="5" aria-label="안내 음성 음량">
+        <span class="vval" id="voiceVolVal">100%</span>
         <button class="tbtn" type="button" id="voiceTest">미리 듣기</button>
       </div>
       <label>목소리 · 눌러서 들어보고 가장 또렷한 걸 고르세요</label>
@@ -467,7 +488,6 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
       <div class="presets ko" id="rateSnd"></div>
       <label>음성 높이 · 야외 스피커에서는 높을수록 잘 들립니다</label>
       <div class="presets ko" id="pitchSnd"></div>
-      <p class="note">음성은 기기가 낼 수 있는 최대 크기로 나옵니다. 위 음량 막대는 효과음과 DJ 응원가에만 적용돼요. 효과음을 낮추면 음성이 더 또렷하게 들립니다.</p>
       <label>득점 소리 · 눌러서 미리 듣기</label>
       <div class="presets ko" id="runSnd"></div>
     </div>
@@ -485,26 +505,26 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 (() => {
   // ★ GitHub 저장소에 올릴 14곡 파일명과 버튼 표시 이름 (필요시 title만 수정)
   const DJ_TRACKS = [
-    { title: '삼성(승리의 라이온즈)', file: './song1.mp3' },
-    { title: '삼성(엘도라도)', file: './song2.mp3' },
-    { title: '롯데(영광의 순간)', file: './song3.mp3' },
-    { title: '롯데(부산갈매기)', file: './song4.mp3' },
-    { title: '롯데(롯데롯데롯데)', file: './song5.mp3' },
-    { title: '두산(승리를 위하여)', file: './song6.mp3' },
-    { title: '엘지(서울의 아리아) 7', file: './song7.mp3' },
-    { title: '엘지(승리의 노래)', file: './song8.mp3' },
-    { title: '삼성(승리를 위해)', file: './song9.mp3' },
-    { title: '기아(외쳐라 최강기아)', file: './song10.mp3' },
-    { title: '기아(남행열차)', file: './song11.mp3' },
-    { title: '아파트(경기 뜨거울때)', file: './song12.mp3' },
-    { title: '아웃송', file: './song13.mp3' },
-    { title: '시작 전 노래', file: './song14.mp3' }
+    { title: '응원가 1', file: './song1.mp3' },
+    { title: '응원가 2', file: './song2.mp3' },
+    { title: '응원가 3', file: './song3.mp3' },
+    { title: '응원가 4', file: './song4.mp3' },
+    { title: '응원가 5', file: './song5.mp3' },
+    { title: '응원가 6', file: './song6.mp3' },
+    { title: '응원가 7', file: './song7.mp3' },
+    { title: '응원가 8', file: './song8.mp3' },
+    { title: '응원가 9', file: './song9.mp3' },
+    { title: '응원가 10', file: './song10.mp3' },
+    { title: '응원가 11', file: './song11.mp3' },
+    { title: '응원가 12', file: './song12.mp3' },
+    { title: '응원가 13', file: './song13.mp3' },
+    { title: '응원가 14', file: './song14.mp3' }
   ];
 
   // 오프라인 캐싱용 Service Worker 등록 (한 번 접속 후 인터넷 없이도 작동)
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     const swCode = `
-      const CACHE = 'baseball-dj-offline-v3';
+      const CACHE = 'baseball-dj-offline-v4';
       const ASSETS = ['./', './index.html', ${DJ_TRACKS.map(t => `'${t.file}'`).join(', ')}];
       self.addEventListener('install', e => {
         self.skipWaiting();
@@ -571,10 +591,15 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   const total = t => s.line[t].reduce((a, b) => a + (b || 0), 0);
   const inningLabel = () => `${s.inning}회 ${s.half ? '말' : '초'}${inter() ? ' · ' + KIND[kindAt(s.inning)] : ''}`;
 
-  // ---------- Sound (Event SFX) ----------
-  let prefs = { on: true, vol: 70, run: 'random', voice: true, rate: 1.15, pitch: 1.8, voiceName: '', v2: true };
+  // ---------- Sound (Independent SFX, DJ, and Voice volumes) ----------
+  let prefs = { on: true, vol: 70, djVol: 40, voiceVol: 100, run: 'random', voice: true, rate: 1.15, pitch: 1.8, voiceName: '', v3: true };
   try { Object.assign(prefs, JSON.parse(localStorage.getItem(PKEY)) || {}); } catch (e) {}
-  if (!prefs.v2) { prefs.rate = 1.15; prefs.pitch = 1.8; prefs.v2 = true; }
+  if (!prefs.v3) {
+    prefs.rate = 1.15; prefs.pitch = 1.8;
+    if (typeof prefs.djVol !== 'number') prefs.djVol = 40;
+    if (typeof prefs.voiceVol !== 'number') prefs.voiceVol = 100;
+    prefs.v3 = true;
+  }
   const savePrefs = () => { try { localStorage.setItem(PKEY, JSON.stringify(prefs)); } catch (e) {} };
   let ctx = null, lastRun = '', noiseBuf = null;
   function ac() {
@@ -654,6 +679,16 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   // ---------- DJ 14-Track Audio Player (Repo MP3s) ----------
   let djAudio = null, djPlayingIdx = null, djLoop = true, djFadeTimer = null;
 
+  function setDjVolume(val) {
+    prefs.djVol = Math.max(0, Math.min(100, +val));
+    if (djAudio) djAudio.volume = prefs.djVol / 100;
+    $('djVolQuick').value = prefs.djVol;
+    $('djVolQuickVal').textContent = prefs.djVol + '%';
+    $('djVol').value = prefs.djVol;
+    $('djVolVal').textContent = prefs.djVol + '%';
+    savePrefs();
+  }
+
   function renderDjTracks() {
     $('djTracks').innerHTML = DJ_TRACKS.map((tr, i) => {
       const on = djPlayingIdx === i;
@@ -665,10 +700,11 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   function stopDJ(fade = false) {
     clearInterval(djFadeTimer); djFadeTimer = null;
     if (djAudio) {
-      if (fade && !djAudio.paused && djAudio.volume > 0.05) {
+      if (fade && !djAudio.paused && djAudio.volume > 0.03) {
         const a = djAudio;
+        const step = Math.max(0.02, a.volume / 8);
         djFadeTimer = setInterval(() => {
-          if (a.volume > 0.08) a.volume = Math.max(0, a.volume - 0.08);
+          if (a.volume > step) a.volume = Math.max(0, a.volume - step);
           else { clearInterval(djFadeTimer); a.pause(); a.currentTime = 0; if (djAudio === a) djAudio = null; }
         }, 35);
       } else {
@@ -686,7 +722,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     const tr = DJ_TRACKS[idx];
     const a = new Audio(tr.file);
     a.loop = djLoop;
-    a.volume = Math.max(0.05, prefs.vol / 100);
+    a.volume = prefs.djVol / 100;
     a.onended = () => { if (djPlayingIdx === idx) { djPlayingIdx = null; renderDjTracks(); } };
     a.onerror = () => {
       $('status').innerHTML = `<b>음원 없음</b> · 저장소에 <b>${esc(tr.file.replace('./', ''))}</b> 파일을 올려주세요`;
@@ -709,6 +745,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     $('djLoopBtn').classList.toggle('on', djLoop);
     $('djLoopBtn').textContent = djLoop ? '🔁 반복 켜짐' : '➡ 1회 재생';
   };
+  $('djVolQuick').addEventListener('input', e => setDjVolume(e.target.value));
+  $('djVol').addEventListener('input', e => setDjVolume(e.target.value));
 
   // ---------- Voice announcer (Web Speech, Korean) ----------
   const synth = window.speechSynthesis || null;
@@ -744,7 +782,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
         const u = new SpeechSynthesisUtterance(text);
         u.lang = 'ko-KR';
         if (koVoice) { const v = synth.getVoices().find(x => x.name === koVoice.name); if (v) u.voice = v; }
-        u.rate = prefs.rate; u.pitch = prefs.pitch; u.volume = 1;
+        u.rate = prefs.rate; u.pitch = prefs.pitch;
+        u.volume = Math.max(0, Math.min(1, prefs.voiceVol / 100));
         let started = false;
         u.onstart = () => { started = true; };
         u.onend = () => { started = true; };
@@ -1011,6 +1050,13 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     $('sndToggle').textContent = prefs.on ? '켜짐' : '꺼짐';
     $('sndToggle').classList.toggle('off', !prefs.on);
     $('vol').value = prefs.vol;
+    $('volVal').textContent = prefs.vol + '%';
+    $('djVol').value = prefs.djVol;
+    $('djVolVal').textContent = prefs.djVol + '%';
+    $('djVolQuick').value = prefs.djVol;
+    $('djVolQuickVal').textContent = prefs.djVol + '%';
+    $('voiceVol').value = prefs.voiceVol;
+    $('voiceVolVal').textContent = prefs.voiceVol + '%';
     $('runSnd').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === prefs.run)));
     $('voiceToggle').textContent = prefs.voice ? '켜짐' : '꺼짐';
     $('voiceToggle').classList.toggle('off', !prefs.voice);
@@ -1045,8 +1091,10 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     const b = e.target.closest('button'); if (!b) return;
     prefs.run = b.dataset.k; savePrefs(); renderSound(); play(b.dataset.k === 'random' ? 'run' : b.dataset.k, true);
   });
-  $('vol').addEventListener('input', e => { prefs.vol = +e.target.value; if (djAudio) djAudio.volume = prefs.vol / 100; savePrefs(); });
+  $('vol').addEventListener('input', e => { prefs.vol = +e.target.value; $('volVal').textContent = prefs.vol + '%'; savePrefs(); });
   $('vol').addEventListener('change', () => play('ball', true));
+  $('voiceVol').addEventListener('input', e => { prefs.voiceVol = +e.target.value; $('voiceVolVal').textContent = prefs.voiceVol + '%'; savePrefs(); });
+  $('voiceVol').addEventListener('change', () => speak('투 스트라이크! 원 아웃!', true));
   $('sndToggle').onclick = toggleSound;
   $('soundBtn').onclick = toggleSound;
 
