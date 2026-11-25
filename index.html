@@ -1,19 +1,5 @@
-<!doctype html>
-<html lang="ko">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0c2117">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="야구 점수판">
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="theme-color" content="#0c2117"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="야구 점수판"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>야구 점수판</title>
-<style>
-:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); box-sizing: border-box; }
-body { margin: 0; }
-[hidden] { display: none !important; }
-</style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Chakra+Petch:wght@500;700&family=IBM+Plex+Sans+KR:wght@400;600&display=swap">
@@ -271,10 +257,17 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .custom { position: relative; width: 30px; height: 30px; border-radius: 50%; overflow: hidden; border: 1px dashed var(--muted); display: grid; place-items: center; color: var(--muted); }
 .custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; padding: 0; border: 0; }
 
+.orderbox { display: grid; gap: 6px; }
+.orow { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); cursor: grab; touch-action: none; user-select: none; position: relative; }
+.orow.locked { cursor: default; opacity: .6; }
+.orow.dragging { z-index: 5; border-color: var(--amber); box-shadow: 0 10px 26px rgb(0 0 0 / .5); background: var(--board); cursor: grabbing; }
+.orow .grip { color: var(--muted); letter-spacing: -2px; }
+.orow .when { flex: none; font-family: var(--f-display); color: var(--amber); min-width: 4.2em; }
+.orow .dot2 { flex: none; width: 14px; height: 14px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--line); }
+.orow .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { .runs.bump, .act.change.ready { animation: none; } * { transition: none !important; } }
 </style>
-</head>
-<body>
+
 <header class="bar">
   <div class="brand">야구 점수판</div>
   <div class="inning" aria-live="polite"><span class="arrow" id="arrow">▲</span><span id="inningLabel">1회 초</span></div>
@@ -388,9 +381,9 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
         <div class="presets ko" id="splitWays"></div>
       </div>
       <div id="interPick" class="field" hidden>
-        <label id="pickLbl0">원정 반</label>
+        <label id="pickLbl0">초 공격 반</label>
         <div class="presets ko" id="classList0"></div>
-        <label id="pickLbl1">홈 반</label>
+        <label id="pickLbl1">말 공격 반</label>
         <div class="presets ko" id="classList1"></div>
         <div id="practiceWays" class="field" hidden>
           <label>연습 타순 정하는 방법 · 누를 때마다 새로 짜요</label>
@@ -403,6 +396,12 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
       <div class="presets" id="batPresets"></div>
       <p class="note dragnote">이름을 <b>마우스로 끌거나</b>, <b>화면을 길게 눌러</b> 옮기세요. 순서 바꾸기, 상대 팀으로 보내기, 대기(결석)로 빼기 모두 같은 방법이에요.</p>
       <div class="lu" id="luBoard"></div>
+    </div>
+    <div class="field">
+      <label>공격 순서 · 위에 있는 팀이 선공(초 공격)해요. 끌어서 바꾸세요</label>
+      <div class="orderbox" id="orderBox"></div>
+      <div class="row" style="justify-content:flex-start"><button class="tbtn" type="button" id="orderSwap">⇅ 초·말 바꾸기</button></div>
+      <p class="note" id="orderNote"></p>
     </div>
     <div class="field">
       <label>팀 이름과 색상</label>
@@ -450,7 +449,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   ];
   const INNING_PRESETS = [3, 5, 6, 7, 9];
   const fresh = (p = {}) => ({
-    names: p.names || ['원정', '홈'], colors: p.colors || ['#2f6fe4', '#e23b3b'], innings: p.innings || 9,
+    names: p.names || ['청팀', '백팀'], colors: p.colors || ['#2f6fe4', '#f4f4f2'], innings: p.innings || 9,
     lineup: p.lineup || [[], []], bench: p.bench || [[], []], mode: p.mode || 'intra', batters: p.batters || 9,
     sets: p.sets || [{ F: [], M: [], X: [] }, { F: [], M: [], X: [] }],
     inning: 1, half: 0, balls: 0, strikes: 0, outs: 0, bases: [false, false, false],
@@ -464,6 +463,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   if (!s.batters) s.batters = 9;
   if (!Array.isArray(s.bench)) s.bench = [[], []];
   if (!s.mode) s.mode = 'intra';
+  // 예전 기본 팀명(원정·홈)을 쓰던 기기는 청팀·백팀으로 바꿔 줌
+  if (Array.isArray(s.names) && s.names[0] === '원정' && s.names[1] === '홈') { s.names = ['청팀', '백팀']; s.colors = ['#2f6fe4', '#f4f4f2']; }
   if (!Array.isArray(s.sets)) s.sets = [{ F: [], M: [], X: [] }, { F: [], M: [], X: [] }];
   if (!Array.isArray(s.bat)) s.bat = [0, 0];
   if (!Array.isArray(s.done)) s.done = [];
@@ -625,15 +626,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   const outSay = n => n <= 3 ? `${KO_N[n]} 아웃` : `${n} 아웃`;
   function scoreText() {
     const a = total(0), h = total(1);
-    const pts = `${s.names[0]} ${a}점, ${s.names[1]} ${h}점.`;
-    if (s.over) return `경기 종료. ${pts} ${s.names[a > h ? 0 : 1]} 승리.`;
-    const lead = a === h ? '동점입니다.' : `${s.names[a > h ? 0 : 1]} ${Math.abs(a - h)}점 리드.`;
-    const outs = s.outs ? outSay(s.outs) : '노 아웃';
-    const st = s.strikes ? `, ${KO_N[s.strikes]} 스트라이크` : '';
-    const on = [0, 1, 2].filter(i => s.bases[i]).map(i => `${i + 1}루`);
-    const runners = on.length === 3 ? '주자 만루.' : on.length ? `주자 ${on.join(', ')}.` : '주자 없음.';
-    const batter = s.halfDone ? '전원 타격 완료.' : `타석에는 ${batterLabel(s.half, s.bat[s.half])}.`;
-    return `${halfSay()}, ${s.names[s.half]} 공격. ${pts} ${lead} ${outs}${st}. ${runners} ${batter}`;
+    return `${s.names[0]} ${a}점, ${s.names[1]} ${h}점.`;
   }
   function readScore() {
     if (!synth) { $('readBtn').firstChild.textContent = '이 브라우저는 음성 미지원'; return; }
@@ -794,7 +787,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
       r.style.setProperty('--c', s.colors[t]);
       r.querySelector('.stripe').style.boxShadow = lum(s.colors[t]) < .03 ? 'inset 0 0 0 2px #3a5d4a' : '';
       r.querySelector('.name').textContent = s.names[t];
-      r.querySelector('.side').textContent = t ? '홈 · 말 공격' : '원정 · 초 공격';
+      r.querySelector('.side').textContent = t ? '말 공격' : '초 공격';
       r.classList.toggle('batting', !s.over && s.half === t);
       const rn = r.querySelector('.runs');
       rn.textContent = tots[t];
@@ -935,7 +928,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 
   [0, 1].forEach(i => {
     $('ts' + i).innerHTML = `
-      <div class="teamset-top"><span class="pv" id="pv${i}"></span><span class="lbl">${i ? '홈' : '원정'}</span><input id="n${i}" maxlength="10" aria-label="${i ? '홈' : '원정'} 팀 이름"></div>
+      <div class="teamset-top"><span class="pv" id="pv${i}"></span><span class="lbl">${i ? '말' : '초'}</span><input id="n${i}" maxlength="10" aria-label="${i ? '홈' : '원정'} 팀 이름"></div>
       <div class="swatches" role="group" aria-label="${i ? '홈' : '원정'} 팀 색상">
         ${PALETTE.map(([nm, hex]) => `<button type="button" class="sw" data-c="${hex}" style="background:${hex}" title="${nm}" aria-label="${nm}"></button>`).join('')}
         <label class="custom" title="직접 고르기">＋<input type="color" id="cc${i}" aria-label="색상 직접 고르기"></label>
@@ -946,6 +939,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   function setDraft(i, hex) {
     draftColors[i] = hex; $('pv' + i).style.background = hex; $('cc' + i).value = hex;
     if (!sheet.hidden) renderBoard();
+    renderOrder();
     $('ts' + i).querySelectorAll('.sw').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.c.toLowerCase() === hex.toLowerCase())));
   }
   // ---------- Roster & batting order (device-only storage) ----------
@@ -1021,7 +1015,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
       const l = shuffle(g.list), k = Math.ceil(l.length / 2); A = l.slice(0, k); B = l.slice(k);
     }
     draft[0].L = A.map(x => x.name); draft[1].L = B.map(x => x.name); draft[0].B = []; draft[1].B = [];
-    $('n0').value = `${g.name} 1팀`; $('n1').value = `${g.name} 2팀`;
+    $('n0').value = '청팀'; $('n1').value = '백팀';
+    setDraft(0, '#2f6fe4'); setDraft(1, '#f4f4f2');
     renderBoard();
   }
   function fillPractice(t) {
@@ -1066,7 +1061,52 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   $('practiceList').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; practiceWay = b.dataset.k; renderPickers(); [0, 1].forEach(t => picked.inter[t] && fillPractice(t)); });
   $('splitWays').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; splitWay = b.dataset.k; renderPickers(); if (picked.intra) fillIntra(); });
   $('batPresets').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; draftBatters = +b.dataset.n; renderPickers(); renderBoard(); });
-  [0, 1].forEach(i => $('n' + i).addEventListener('input', renderBoard));
+  [0, 1].forEach(i => $('n' + i).addEventListener('input', () => { renderBoard(); renderOrder(); }));
+
+  // ---------- 초·말 공격 순서 (끌어서 바꾸기) ----------
+  // 경기가 시작된 뒤에는 점수·타순이 섞일 수 있어 바꿀 수 없고, 새 경기에서 바꾸면 돼요
+  const orderLocked = () => !(total(0) === 0 && total(1) === 0 && s.inning === 1 && s.half === 0 && s.outs === 0 && !s.strikes && !s.done.length && !s.over);
+  function renderOrder() {
+    const box = $('orderBox'); if (!box || !$('n0')) return;
+    const lock = orderLocked();
+    box.innerHTML = [0, 1].map(t => {
+      const nm = ($('n' + t).value || '').trim() || s.names[t];
+      return `<div class="orow${lock ? ' locked' : ''}" data-k="${t}"><span class="grip" aria-hidden="true">⋮⋮</span><span class="when">${t ? '말 공격' : '초 공격'}</span><span class="dot2" style="background:${draftColors[t] || s.colors[t]}"></span><span class="nm">${esc(nm)}</span></div>`;
+    }).join('');
+    $('orderSwap').disabled = lock;
+    $('orderNote').textContent = lock ? '경기가 진행 중이라 지금은 바꿀 수 없어요. 「새 경기 시작」을 누른 뒤 바꾸세요.' : '저장을 누르면 적용돼요. 팀 이름·색·타순이 함께 움직여요.';
+  }
+  function swapOrder() {
+    if (orderLocked()) return;
+    const a = $('n0').value, b = $('n1').value; $('n0').value = b; $('n1').value = a;
+    const c0 = draftColors[0], c1 = draftColors[1];
+    [draft[0], draft[1]] = [draft[1], draft[0]];
+    picked.inter = [picked.inter[1], picked.inter[0]];
+    setDraft(0, c1); setDraft(1, c0);
+    renderPickers(); renderBoard(); renderOrder();
+  }
+  $('orderSwap').onclick = swapOrder;
+  let od = null;
+  $('orderBox').addEventListener('pointerdown', e => {
+    const row = e.target.closest('.orow'); if (!row || orderLocked() || (e.button && e.button !== 0)) return;
+    od = { row, id: e.pointerId, y0: e.clientY, k: +row.dataset.k, h: row.getBoundingClientRect().height };
+    try { row.setPointerCapture(e.pointerId); } catch (x) {}
+    row.classList.add('dragging');
+  });
+  $('orderBox').addEventListener('pointermove', e => {
+    if (!od || e.pointerId !== od.id) return;
+    const dy = e.clientY - od.y0;
+    od.row.style.transform = `translateY(${od.k === 0 ? Math.max(0, Math.min(dy, od.h + 6)) : Math.min(0, Math.max(dy, -(od.h + 6)))}px)`;
+  });
+  const endOrder = e => {
+    if (!od || e.pointerId !== od.id) return;
+    const dy = e.clientY - od.y0, o = od; od = null;
+    o.row.style.transform = ''; o.row.classList.remove('dragging');
+    if (e.type === 'pointerup' && ((o.k === 0 && dy > o.h * .5) || (o.k === 1 && dy < -o.h * .5))) swapOrder();
+    else renderOrder();
+  };
+  $('orderBox').addEventListener('pointerup', endOrder);
+  $('orderBox').addEventListener('pointercancel', endOrder);
 
   function persistInter() {
     if (draftMode !== 'inter') return;
@@ -1254,7 +1294,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     picked.inter = [0, 1].map(t => draftMode !== 'intra' && known.includes(s.names[t]) ? s.names[t] : '');
     [0, 1].forEach(i => { $('n' + i).value = s.names[i]; setDraft(i, s.colors[i]); });
     $('rosterBox').open = false;
-    renderPickers(); renderBoard();
+    renderPickers(); renderBoard(); renderOrder();
     $('innings').value = s.innings; syncInn(); renderSound();
     resetBtn.classList.remove('armed'); resetBtn.textContent = '새 경기 시작';
     sheet.hidden = false; formEl.scrollTop = 0;
@@ -1330,5 +1370,5 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   render(); renderSound();
 })();
 </script>
-</body>
-</html>
+
+</body></html>
