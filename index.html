@@ -1,11 +1,9 @@
 <!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="theme-color" content="#0c2117"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="야구 점수판"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>야구 점수판</title>
+<title>야구 점수판 · DJ 턴테이블</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Chakra+Petch:wght@500;700&family=IBM+Plex+Sans+KR:wght@400;600&display=swap">
 <style>
-/* Layout: ballpark scoreboard in one committed dark-green look. Phone: score → count/diamond → controls → line score.
-   Wide/landscape: two columns (score + line score | count + controls). B/S/O lamps use the stadium convention green/yellow/red. */
 :root {
   color-scheme: dark;
   --bg: #0c2117;
@@ -61,9 +59,9 @@ button:disabled { opacity: .35; cursor: not-allowed; }
 .status b { color: var(--fg); font-weight: 600; }
 
 /* Main grid */
-.layout { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "score" "bat" "count" "ctrls" "line"; }
+.layout { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "score" "bat" "count" "ctrls" "dj" "line"; }
 @media (min-width: 900px), (orientation: landscape) and (min-width: 640px) {
-  .layout { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); grid-template-areas: "score count" "bat ctrls" "line ctrls"; align-items: start; }
+  .layout { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); grid-template-areas: "score count" "bat ctrls" "line dj"; align-items: start; }
 }
 .panel { background: var(--board); border: 1px solid var(--line); border-radius: var(--r); padding: 12px; min-width: 0; }
 
@@ -164,10 +162,55 @@ button:disabled { opacity: .35; cursor: not-allowed; }
 @keyframes pulse { 50% { background: color-mix(in srgb, var(--amber) 42%, var(--board-2)); } }
 .act.run { --k: var(--amber); background: var(--amber); color: #1d1600; }
 .act.run small { color: #5a4600; }
-.act.read { --k: var(--fg); grid-column: 1 / -1; min-height: 56px; font-size: clamp(1.05rem, 3.4vw, 1.35rem); }
+.act.read { --k: var(--fg); grid-column: 1 / -1; min-height: 52px; font-size: clamp(1rem, 3.2vw, 1.25rem); }
 .act.read.speaking { background: color-mix(in srgb, var(--fg) 30%, var(--board-2)); }
 .act.minor { min-height: 46px; font-family: var(--f-ui); font-weight: 600; font-size: .92rem; }
 @media (hover: none) { .act small, .tbtn kbd, .hint { display: none; } }
+
+/* DJ Turntable Panel */
+.djbox { grid-area: dj; display: grid; gap: 10px; }
+.dj-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dj-title { font-family: var(--f-display); font-size: 1.05rem; color: var(--amber); margin-right: auto; display: flex; align-items: center; gap: 6px; }
+.dj-disc { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--amber); border-top-color: transparent; }
+.dj-disc.spin { animation: spin 1s linear infinite; }
+@keyframes spin { 100% { transform: rotate(360deg); } }
+.dj-stop {
+  background: color-mix(in srgb, var(--lamp-o) 22%, var(--board-2));
+  border: 1px solid var(--lamp-o); color: #ffb4b0; border-radius: 8px;
+  padding: 5px 10px; font-size: .8rem; font-weight: 600; min-height: 32px;
+}
+.dj-stop:active { background: var(--lamp-o); color: #fff; }
+.dj-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.pad {
+  --pc: #38bdf8;
+  background: color-mix(in srgb, var(--pc) 14%, var(--board-2));
+  border: 1px solid color-mix(in srgb, var(--pc) 65%, var(--line));
+  border-radius: 10px; padding: 8px 6px; min-height: 52px;
+  display: grid; place-content: center; gap: 2px; text-align: center;
+  font-weight: 600; font-size: .88rem; line-height: 1.15;
+}
+.pad small { font-size: .68rem; color: var(--muted); font-weight: 400; }
+.pad.playing {
+  background: var(--pc); color: #091510; border-color: var(--pc); font-weight: 700;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--pc) 55%, transparent);
+}
+.pad.playing small { color: #091510; opacity: .85; }
+.dj-custom { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.cslot { display: flex; gap: 4px; min-width: 0; }
+.cplay {
+  flex: 1; min-width: 0; background: var(--board-2); border: 1px solid var(--line);
+  border-radius: 9px; padding: 6px 8px; min-height: 40px; font-size: .8rem; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;
+}
+.cplay.has { border-color: var(--lamp-b); color: var(--fg); }
+.cplay.playing { background: var(--lamp-b); color: #091510; border-color: var(--lamp-b); }
+.cload {
+  flex: none; width: 34px; background: var(--board-2); border: 1px solid var(--line);
+  border-radius: 9px; display: grid; place-items: center; font-size: .85rem; color: var(--muted);
+  cursor: pointer; position: relative; overflow: hidden;
+}
+.cload:hover { border-color: var(--amber); color: var(--amber); }
+.cload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
 
 /* Line score */
 .linewrap { grid-area: line; overflow-x: auto; padding: 0; }
@@ -265,11 +308,11 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .orow .when { flex: none; font-family: var(--f-display); color: var(--amber); min-width: 4.2em; }
 .orow .dot2 { flex: none; width: 14px; height: 14px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--line); }
 .orow .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-@media (prefers-reduced-motion: reduce) { .runs.bump, .act.change.ready { animation: none; } * { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { .runs.bump, .act.change.ready, .dj-disc.spin { animation: none; } * { transition: none !important; } }
 </style>
 
 <header class="bar">
-  <div class="brand">야구 점수판</div>
+  <div class="brand">야구 점수판 · DJ</div>
   <div class="inning" aria-live="polite"><span class="arrow" id="arrow">▲</span><span id="inningLabel">1회 초</span></div>
   <div class="tools">
     <button class="tbtn" id="soundBtn" type="button">소리<kbd>M</kbd></button>
@@ -318,12 +361,32 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     <button class="act read" type="button" id="readBtn">스코어 읽어주기<small>V</small></button>
   </section>
 
+  <section class="panel djbox" aria-label="DJ 턴테이블">
+    <div class="dj-head">
+      <div class="dj-title"><span class="dj-disc" id="djDisc"></span>DJ 턴테이블 · 응원가</div>
+      <button type="button" class="dj-stop" id="djStopBtn">⏹ 정지 / 페이드아웃</button>
+    </div>
+    <div class="dj-grid" id="djPads">
+      <button type="button" class="pad" data-dj="clapBeat" style="--pc:#ffc93c">짝짝짝 짝짝!<small>기본 박수 비트</small></button>
+      <button type="button" class="pad" data-dj="chargeLoop" style="--pc:#38bdf8">차지 오르간<small>타석 집중 멜로디</small></button>
+      <button type="button" class="pad" data-dj="march" style="--pc:#3ddc84">돌격 응원가<small>신나는 행진곡</small></button>
+      <button type="button" class="pad" data-dj="tension" style="--pc:#ff8a2a">두근두근 드럼<small>찬스·위기 비트</small></button>
+      <button type="button" class="pad" data-dj="fanfare" style="--pc:#c084fc">홈런 팡파르<small>대형 안타 축하</small></button>
+      <button type="button" class="pad" data-dj="siren" style="--pc:#ff5148">파울 주의!<small>안전 경고음</small></button>
+    </div>
+    <div class="dj-custom" id="djCustom">
+      <div class="cslot"><button type="button" class="cplay" data-slot="0">🎵 내 음원 1</button><label class="cload" title="MP3 음원 불러오기">📂<input type="file" accept="audio/*" data-slot="0"></label></div>
+      <div class="cslot"><button type="button" class="cplay" data-slot="1">🎵 내 음원 2</button><label class="cload" title="MP3 음원 불러오기">📂<input type="file" accept="audio/*" data-slot="1"></label></div>
+      <div class="cslot"><button type="button" class="cplay" data-slot="2">🎵 내 음원 3</button><label class="cload" title="MP3 음원 불러오기">📂<input type="file" accept="audio/*" data-slot="2"></label></div>
+    </div>
+  </section>
+
   <section class="panel linewrap" aria-label="이닝별 점수">
     <table id="lineTable"></table>
   </section>
 </main>
 
-<footer class="hint">키보드: S 스트라이크 · O 아웃 · H 세이프 · A 안타 · D 2루타 · R 득점 · C 공수 교대 · 1·2·3 주자 · V 스코어 읽기 · Z 되돌리기 · M 소리</footer>
+<footer class="hint">키보드: S 스트라이크 · O 아웃 · H 세이프 · A 안타 · D 2루타 · R 득점 · C 공수 교대 · 1·2·3 주자 · V 스코어 읽기 · Z 되돌리기 · M 소리 · Space DJ 정지</footer>
 
 <div class="sheet-wrap" id="finalWrap" hidden>
   <div class="sheet final">
@@ -409,7 +472,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
       <div class="teamset" id="ts1"></div>
     </div>
     <div class="field">
-      <label>소리 · 막대는 효과음 크기</label>
+      <label>소리 · 막대는 효과음 및 DJ 턴테이블 크기</label>
       <div class="soundrow">
         <button class="tbtn" type="button" id="sndToggle">켜짐</button>
         <input type="range" id="vol" min="0" max="100" step="5" aria-label="음량">
@@ -425,7 +488,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
       <div class="presets ko" id="rateSnd"></div>
       <label>음성 높이 · 야외 스피커에서는 높을수록 잘 들립니다</label>
       <div class="presets ko" id="pitchSnd"></div>
-      <p class="note">음성은 기기가 낼 수 있는 최대 크기로 나옵니다. 위 음량 막대는 효과음에만 적용돼요. 효과음을 낮추면 음성이 더 또렷하게 들립니다.</p>
+      <p class="note">음성은 기기가 낼 수 있는 최대 크기로 나옵니다. 위 음량 막대는 효과음과 DJ 응원가에만 적용돼요. 효과음을 낮추면 음성이 더 또렷하게 들립니다.</p>
       <label>득점 소리 · 눌러서 미리 듣기</label>
       <div class="presets ko" id="runSnd"></div>
     </div>
@@ -463,13 +526,11 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   if (!s.batters) s.batters = 9;
   if (!Array.isArray(s.bench)) s.bench = [[], []];
   if (!s.mode) s.mode = 'intra';
-  // 예전 기본 팀명(원정·홈)을 쓰던 기기는 청팀·백팀으로 바꿔 줌
   if (Array.isArray(s.names) && s.names[0] === '원정' && s.names[1] === '홈') { s.names = ['청팀', '백팀']; s.colors = ['#2f6fe4', '#f4f4f2']; }
   if (!Array.isArray(s.sets)) s.sets = [{ F: [], M: [], X: [] }, { F: [], M: [], X: [] }];
   if (!Array.isArray(s.bat)) s.bat = [0, 0];
   if (!Array.isArray(s.done)) s.done = [];
-  // Batting order helpers
-  // 반 대항: 1회 여자 · 2회 남자 · 3회 혼성 (연장은 혼성)
+
   const SCHED = ['F', 'M', 'X'], KIND = { F: '여자', M: '남자', X: '혼성' };
   const kindAt = i => i <= SCHED.length ? SCHED[i - 1] : 'X';
   const inter = () => s.mode === 'inter' || s.mode === 'practice';
@@ -566,6 +627,137 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     } catch (e) {}
   }
 
+  // ---------- DJ Turntable (Built-in Loops + Custom Audio Files) ----------
+  let djTimer = null, djActivePad = null, djAudio = null, djFadeTimer = null;
+  const customTracks = [null, null, null];
+
+  function updateDjUI(activeId) {
+    djActivePad = activeId;
+    $('djDisc').classList.toggle('spin', !!activeId);
+    document.querySelectorAll('#djPads .pad').forEach(b => b.classList.toggle('playing', b.dataset.dj === activeId));
+    document.querySelectorAll('#djCustom .cplay').forEach(b => b.classList.toggle('playing', 'slot' + b.dataset.slot === activeId));
+  }
+
+  function stopDJ(fade = false) {
+    clearInterval(djTimer); djTimer = null;
+    clearInterval(djFadeTimer); djFadeTimer = null;
+    if (djAudio) {
+      if (fade && !djAudio.paused && djAudio.volume > 0.05) {
+        const a = djAudio;
+        djFadeTimer = setInterval(() => {
+          if (a.volume > 0.08) { a.volume = Math.max(0, a.volume - 0.08); }
+          else { clearInterval(djFadeTimer); a.pause(); a.currentTime = 0; if (djAudio === a) djAudio = null; }
+        }, 40);
+      } else {
+        djAudio.pause(); djAudio.currentTime = 0; djAudio = null;
+      }
+    }
+    updateDjUI(null);
+  }
+
+  const DJ_SYNTH = {
+    clapBeat(c, d) {
+      // 짝-짝-짝, 짝-짝! 야구장 기본 박수 응원 리듬 (루프)
+      const step = () => {
+        [0, .28, .56, .98, 1.24].forEach((at, idx) => {
+          tone(c, d, idx >= 3 ? 180 : 130, at, .14, 'sine', .75, 48);
+          [0, .012, .025].forEach(x => noise(c, d, at + x, .11, .55, 1350, .85));
+        });
+      };
+      step();
+      djTimer = setInterval(step, 1750);
+    },
+    chargeLoop(c, d) {
+      // 타석 응원 차지 오르간 (루프)
+      const step = () => {
+        [[392, 0], [523, .16], [659, .32], [784, .48], [659, .78], [784, .94]].forEach(([f, a], k) =>
+          organ(c, d, f, a, k === 5 ? .65 : .15, .95));
+      };
+      step();
+      djTimer = setInterval(step, 2000);
+    },
+    march(c, d) {
+      // 신나는 야구장 공격 행진곡 멜로디 (루프)
+      const notes = [
+        [523, 0, .18], [523, .22, .18], [659, .44, .18], [784, .66, .35],
+        [659, 1.1, .18], [784, 1.32, .18], [1047, 1.54, .45]
+      ];
+      const step = () => {
+        notes.forEach(([f, at, dur]) => {
+          organ(c, d, f, at, dur, .85);
+          tone(c, d, f / 2, at, dur, 'triangle', .35);
+        });
+        [0, .44, .88, 1.32, 1.76].forEach(b => tone(c, d, 110, b, .12, 'sine', .6, 42));
+      };
+      step();
+      djTimer = setInterval(step, 2200);
+    },
+    tension(c, d) {
+      // 찬스/위기 두근두근 심장박동 베이스 (루프)
+      const step = () => {
+        tone(c, d, 95, 0, .14, 'sine', .85, 42);
+        tone(c, d, 110, .18, .16, 'sine', .75, 48);
+        noise(c, d, .36, .06, .25, 2400, 1.2);
+      };
+      step();
+      djTimer = setInterval(step, 720);
+    },
+    fanfare(c, d) {
+      SFX.win(c, d);
+      setTimeout(() => { if (djActivePad === 'fanfare') updateDjUI(null); }, 2800);
+    },
+    siren(c, d) {
+      // 파울 주의 경고음 (2회 울림)
+      [0, .45].forEach(at => {
+        tone(c, d, 780, at, .38, 'sawtooth', .25, 1180, 2200);
+      });
+      setTimeout(() => { if (djActivePad === 'siren') updateDjUI(null); }, 950);
+    }
+  };
+
+  $('djPads').addEventListener('click', e => {
+    const b = e.target.closest('.pad'); if (!b) return;
+    const id = b.dataset.dj;
+    if (djActivePad === id) { stopDJ(true); return; }
+    stopDJ(false);
+    if (!prefs.on) { prefs.on = true; savePrefs(); renderSound(); }
+    const c = ac(); if (!c) return;
+    updateDjUI(id);
+    DJ_SYNTH[id](c, out(c));
+  });
+
+  $('djStopBtn').onclick = () => stopDJ(true);
+
+  $('djCustom').addEventListener('change', e => {
+    const inp = e.target.closest('input[type="file"]'); if (!inp || !inp.files[0]) return;
+    const slot = +inp.dataset.slot, file = inp.files[0];
+    if (customTracks[slot]) URL.revokeObjectURL(customTracks[slot].url);
+    const url = URL.createObjectURL(file);
+    const title = file.name.replace(/\.[^.]+$/, '');
+    customTracks[slot] = { url, title };
+    const btn = $('djCustom').querySelector(`.cplay[data-slot="${slot}"]`);
+    btn.textContent = '▶ ' + title;
+    btn.classList.add('has');
+  });
+
+  $('djCustom').addEventListener('click', e => {
+    const btn = e.target.closest('.cplay'); if (!btn) return;
+    const slot = +btn.dataset.slot, id = 'slot' + slot;
+    if (djActivePad === id) { stopDJ(true); return; }
+    if (!customTracks[slot]) {
+      btn.parentElement.querySelector('input[type="file"]').click();
+      return;
+    }
+    stopDJ(false);
+    if (!prefs.on) { prefs.on = true; savePrefs(); renderSound(); }
+    const a = new Audio(customTracks[slot].url);
+    a.volume = Math.max(0.1, prefs.vol / 100);
+    a.onended = () => { if (djActivePad === id) updateDjUI(null); };
+    a.play().catch(() => {});
+    djAudio = a;
+    updateDjUI(id);
+  });
+
   // ---------- Voice announcer (Web Speech, Korean) ----------
   const synth = window.speechSynthesis || null;
   let koVoice = null, koVoices = [], sayTimer = null, say = '';
@@ -620,7 +812,6 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     };
     if (delay) sayTimer = setTimeout(go, delay); else go();
   }
-  // iOS/Safari: unlock speech on the first touch
   document.addEventListener('pointerdown', () => { try { if (synth) { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); } } catch (e) {} }, { once: true });
   const KO_N = ['', '원', '투', '쓰리'];
   const outSay = n => n <= 3 ? `${KO_N[n]} 아웃` : `${n} 아웃`;
@@ -642,11 +833,6 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     s.line[t][i] = Math.max(0, (s.line[t][i] || 0) + n);
     if (n > 0 && s.half === 1 && s.inning >= s.innings && total(1) > total(0)) s.over = true;
   }
-  function forceAdvance() {
-    const b = s.bases;
-    if (!b[0]) b[0] = true; else if (!b[1]) b[1] = true; else if (!b[2]) b[2] = true; else { addRun(1); return true; }
-    return false;
-  }
   function endHalf() {
     s.outs = 0; resetCount(); s.bases = [false, false, false]; s.done = []; s.halfDone = false;
     const a = total(0), h = total(1);
@@ -656,7 +842,6 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     else { s.half = 0; s.inning++; s.line[0][s.inning - 1] = s.line[0][s.inning - 1] || 0; }
     if (inter()) s.bat = [0, 0];
   }
-  // 안타 = 모든 주자 1베이스, 2루타 = 2베이스 진루 (최대 2베이스). 홈을 밟은 주자는 자동 득점
   function hitBy(n) {
     if (s.halfDone) return null;
     const t = s.half, who = batterLabel(t, s.bat[t] % batN(t));
@@ -670,7 +855,6 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     finishBatter();
     return s.over ? 'win' : runs ? 'run' : 'hit';
   }
-  // 전원타격제: a batter's turn ends with out or safe; the half ends when everyone has batted
   function finishBatter() {
     const t = s.half, n = batN(t), cur = s.bat[t] % n;
     resetCount();
@@ -805,7 +989,6 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     $('undoBtn').disabled = !undoStack.length;
     $('status').innerHTML = s.last || '전원타격제 · 타자마다 <b>아웃</b> 또는 <b>세이프</b>를 누르면 다음 타자로 넘어가요. 3스트라이크는 자동 아웃.';
 
-    // Line score
     const cols = Math.max(s.innings, s.inning);
     let h = '<thead><tr><th class="tn">팀</th>';
     for (let i = 1; i <= cols; i++) h += `<th class="${i === s.inning && !s.over ? 'ccol' : ''}">${i}${inter() ? `<small>${KIND[kindAt(i)]}</small>` : ''}</th>`;
@@ -823,7 +1006,6 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     });
     $('lineTable').innerHTML = h + '</tbody>';
 
-    // Final overlay
     if (s.over && !finalDismissed) {
       const w = tots[0] > tots[1] ? 0 : 1;
       $('finalWinner').textContent = `${s.names[w]} 승리!`;
@@ -904,14 +1086,14 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     if (!synth) { $('voiceTest').textContent = '이 브라우저는 음성 미지원'; return; }
     speak('투 스트라이크! 원 아웃!', true);
   };
-  function toggleSound() { prefs.on = !prefs.on; savePrefs(); renderSound(); if (prefs.on) play('tick'); else { try { synth && synth.cancel(); } catch (e) {} } }
+  function toggleSound() { prefs.on = !prefs.on; savePrefs(); renderSound(); if (prefs.on) play('tick'); else { stopDJ(false); try { synth && synth.cancel(); } catch (e) {} } }
   $('runSnd').innerHTML = '<button type="button" data-k="random">랜덤</button>' +
     Object.entries(RUN_SOUNDS).map(([k, [nm]]) => `<button type="button" data-k="${k}">${nm}</button>`).join('');
   $('runSnd').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     prefs.run = b.dataset.k; savePrefs(); renderSound(); play(b.dataset.k === 'random' ? 'run' : b.dataset.k, true);
   });
-  $('vol').addEventListener('input', e => { prefs.vol = +e.target.value; savePrefs(); });
+  $('vol').addEventListener('input', e => { prefs.vol = +e.target.value; if (djAudio) djAudio.volume = prefs.vol / 100; savePrefs(); });
   $('vol').addEventListener('change', () => play('ball', true));
   $('sndToggle').onclick = toggleSound;
   $('soundBtn').onclick = toggleSound;
@@ -942,6 +1124,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     renderOrder();
     $('ts' + i).querySelectorAll('.sw').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.c.toLowerCase() === hex.toLowerCase())));
   }
+
   // ---------- Roster & batting order (device-only storage) ----------
   const RKEY = 'baseball-roster-v1', GKEY = 'baseball-gender-v1';
   let rosterText = '', splitWay = 'avg', practiceWay = 'avg', draftBatters = 9, draftMode = 'intra';
@@ -962,7 +1145,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
       const am = line.match(/\s+(0?\.\d+|1(?:\.0+)?)$/); if (am) { avg = parseFloat(am[1]); line = line.slice(0, am.index); }
       const gm = line.match(GTOK), idm = line.match(/^(\d{4,5})\b/);
       let g = gm ? (/^(여|여자|女|F)$/i.test(gm[1]) ? 'F' : 'M') : '';
-      if (!g && idm) g = (+idm[1] % 100) <= 20 ? 'F' : 'M';   // 학번 01~20 여학생, 21~ 남학생
+      if (!g && idm) g = (+idm[1] % 100) <= 20 ? 'F' : 'M';
       const nm = cleanName(line); if (!nm) return;
       if (!cur) { cur = { name: '명단', list: [] }; groups.push(cur); }
       cur.list.push({ name: nm, g, avg, id: idm ? +idm[1] : 0 });
@@ -974,7 +1157,6 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   $('practiceList').innerHTML = SPLITS.map(([k, nm]) => `<button type="button" data-k="${k}">${nm}</button>`).join('');
   const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const byAvg = a => a.slice().sort((x, y) => (y.avg ?? -1) - (x.avg ?? -1) || x.id - y.id);
-  const hasAvg = g => g.list.some(x => x.avg != null);
   $('splitWays').innerHTML = SPLITS.map(([k, nm]) => `<button type="button" data-k="${k}">${nm}</button>`).join('');
   $('batPresets').innerHTML = [8, 9].map(n => `<button type="button" data-n="${n}">${n}명</button>`).join('');
   const classSort = (a, b) => (parseInt(a, 10) || 99) - (parseInt(b, 10) || 99) || a.localeCompare(b);
@@ -1008,7 +1190,6 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     const g = groups().find(x => x.name === picked.intra); if (!g) return;
     let A = [], B = [];
     if (splitWay === 'avg') {
-      // 타율 순으로 뱀 모양(1·2·2·1…) 배분 → 두 팀 실력이 고르게, 팀 안에서는 타율 높은 순
       byAvg(g.list).forEach((x, i) => ((i % 4 === 0 || i % 4 === 3) ? A : B).push(x));
       A = byAvg(A); B = byAvg(B);
     } else {
@@ -1024,7 +1205,6 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     const n = draftBatters, order = practiceWay === 'avg' ? byAvg : shuffle;
     const F = order(g.list.filter(x => x.g === 'F')), M = order(g.list.filter(x => x.g === 'M'));
     const Fl = F.slice(0, n), Ml = M.slice(0, n), Fx = F.slice(n), Mx = M.slice(n);
-    // 혼성: 1·2회에 빠진 학생 먼저, 나머지는 여·남 번갈아
     const fq = Fx.concat(Fl), mq = Mx.concat(Ml), X = [];
     const fFirst = practiceWay !== 'avg' || (F[0] && M[0] ? (F[0].avg ?? 0) >= (M[0].avg ?? 0) : !!F[0]);
     while (X.length < n && (fq.length || mq.length)) for (const q of (fFirst ? [fq, mq] : [mq, fq])) if (q.length && X.length < n) X.push(q.shift());
@@ -1063,8 +1243,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   $('batPresets').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; draftBatters = +b.dataset.n; renderPickers(); renderBoard(); });
   [0, 1].forEach(i => $('n' + i).addEventListener('input', () => { renderBoard(); renderOrder(); }));
 
-  // ---------- 초·말 공격 순서 (끌어서 바꾸기) ----------
-  // 경기가 시작된 뒤에는 점수·타순이 섞일 수 있어 바꿀 수 없고, 새 경기에서 바꾸면 돼요
+  // ---------- 초·말 공격 순서 ----------
   const orderLocked = () => !(total(0) === 0 && total(1) === 0 && s.inning === 1 && s.half === 0 && s.outs === 0 && !s.strikes && !s.done.length && !s.over);
   function renderOrder() {
     const box = $('orderBox'); if (!box || !$('n0')) return;
@@ -1114,7 +1293,6 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     [0, 1].forEach(t => { const c = picked.inter[t]; if (c) { const d = draft[t]; gmeta[c] = { F: d.F.slice(), M: d.M.slice(), X: d.X.slice() }; any = true; } });
     if (any) { try { localStorage.setItem(GKEY, JSON.stringify(gmeta)); } catch (e) {} }
   }
-  // Pre-saved class-match lineups: "2반 여자" / "2반 남자" / "2반 혼성" headers, one name per line
   const KMAP = { 여자: 'F', 여: 'F', 남자: 'M', 남: 'M', 혼성: 'X', 혼: 'X' };
   function importInter(text) {
     const got = {}; let cur = null;
@@ -1125,10 +1303,6 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
       const nm = cleanName(l); if (nm && cur) cur.push(nm);
     });
     return got;
-  }
-  function exportInter() {
-    return Object.keys(gmeta).sort(classSort).map(c => ['F', 'M', 'X'].map(k =>
-      `${c} ${KIND[k]}\n${(gmeta[c][k] || []).join('\n')}`).join('\n\n')).join('\n\n');
   }
   const toCode = obj => 'PB1:' + btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
   const fromCode = txt => JSON.parse(decodeURIComponent(escape(atob(txt.trim().slice(4).replace(/\s+/g, '')))));
@@ -1159,7 +1333,6 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     catch (e) { $('interPaste').select(); $('interMsg').textContent = '칸에 꺼냈어요. 전체 선택해서 복사한 뒤 받는 기기로 보내세요.'; }
   };
 
-  // Drop lists are keyed "<team><kind>": L 타순(반 안), F 여자, M 남자, X 혼성, B 대기
   const listOf = key => draft[+key[0]][key[1]];
   const NUMBERED = { L: 1, F: 1, M: 1, X: 1 };
   function itemHTML(key, i, nm) {
@@ -1193,17 +1366,16 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
         ${section(t, 'B', '대기 · 결석', '여기로 끌어 놓으면 타순에서 빠져요')}</div>`;
     }).join('');
   }
-  // One place for every move so buttons and drag behave the same
   function moveItem(from, i, to, idx) {
     const src = listOf(from), nm = src[i];
     if (to === 'drop') { if (from[1] === 'X') src.splice(i, 1); return; }
     const dst = listOf(to);
     if (from === to) { src.splice(i, 1); dst.splice(idx == null ? dst.length : idx, 0, nm); return; }
-    if (to[1] === 'X') {                       // copy into 혼성
+    if (to[1] === 'X') {
       const old = dst.indexOf(nm); if (old >= 0) { dst.splice(old, 1); if (idx != null && old < idx) idx--; }
       dst.splice(idx == null ? dst.length : idx, 0, nm); return;
     }
-    if (from[1] === 'X') { src.splice(i, 1); return; }   // dragging out of 혼성 just removes it
+    if (from[1] === 'X') { src.splice(i, 1); return; }
     src.splice(i, 1);
     dst.splice(idx == null ? dst.length : idx, 0, nm);
     if (to[1] === 'B') { const x = draft[+from[0]].X, j = x.indexOf(nm); if (j >= 0) x.splice(j, 1); }
@@ -1216,7 +1388,6 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     moveItem(li.dataset.list, +li.dataset.i, mv.dataset.to, null); persistInter(); renderBoard();
   });
 
-  // Drag: mouse drags right away; touch needs a long press so normal scrolling still works
   let pend = null, drag = null, scrollTimer = null;
   const formEl = $('setForm');
   $('luBoard').addEventListener('pointerdown', e => {
@@ -1355,6 +1526,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   document.addEventListener('keydown', e => {
     if (!sheet.hidden) { if (e.key === 'Escape') closeSheet(); return; }
     if (e.target.closest('input, textarea') || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.code === 'Space') { e.preventDefault(); stopDJ(true); return; }
     const k = e.key.toLowerCase();
     if (KEYS[k]) { e.preventDefault(); act(KEYS[k]); }
     else if (['1', '2', '3'].includes(k)) toggleBase(+k - 1);
