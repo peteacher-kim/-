@@ -362,7 +362,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   <section class="panel djbox" aria-label="DJ 턴테이블">
     <div class="dj-head">
       <div class="dj-title"><span class="dj-disc" id="djDisc"></span>DJ 턴테이블 · 응원가 (<span id="djCount">21</span>곡)</div>
-      <button type="button" class="dj-loop on" id="djLoopBtn">🔁 반복 켜짐</button>
+      <button type="button" class="dj-loop" id="djLoopBtn">➡ 1회 재생</button>
       <button type="button" class="dj-stop" id="djStopBtn">⏹ 정지</button>
     </div>
     <div class="dj-vol-bar">
@@ -689,7 +689,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   }
 
   // ---------- DJ 14-Track Audio Player (Repo MP3s) ----------
-  let djAudio = null, djPlayingIdx = null, djLoop = true, djFadeTimer = null;
+  let djAudio = null, djPlayingIdx = null, djLoop = false, djFadeTimer = null;
 
   function setDjVolume(val) {
     prefs.djVol = Math.max(0, Math.min(100, +val));
