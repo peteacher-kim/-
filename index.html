@@ -434,6 +434,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
         <div class="presets ko" id="classList"></div>
         <label>팀 나누는 방법 · 누를 때마다 새로 짜요</label>
         <div class="presets ko" id="splitWays"></div>
+        <p class="note" id="splitMsg" aria-live="polite"></p>
       </div>
       <div id="interPick" class="field" hidden>
         <label id="pickLbl0">초 공격 반</label>
@@ -853,6 +854,13 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     s.bat[t] = (cur + 1) % n;
     if (s.done.length >= n) {
       s.halfDone = true;
+      const a = total(0), hm = total(1);
+      // 마지막 이닝: 결과가 정해졌으면 공수 교대를 기다리지 않고 바로 경기 종료
+      if (s.inning >= s.innings && ((s.half === 1 && a !== hm) || (s.half === 0 && hm > a))) {
+        endHalf();
+        s.last = `<b>경기 종료</b> · ${esc(s.names[0])} ${a} : ${hm} ${esc(s.names[1])}`;
+        return;
+      }
       say += ' 전원 타격 완료! 공수 교대를 눌러 주세요.';
       s.last += ' · <b>전원 타격 완료</b> → 득점을 입력하고 공수 교대를 누르세요';
     } else {
@@ -908,12 +916,12 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     const snd = fn();
     if (snd === null) return;
     undoStack.push(snap); if (undoStack.length > 300) undoStack.shift();
-    save(); render(); play(snd);
+    save(); render(); play(s.over && !wasOver ? 'win' : snd);
     if (s.over && !wasOver) {
       const a = total(0), h = total(1);
       say = `경기 종료! ${s.names[a > h ? 0 : 1]} 승리. ${a} 대 ${h}`;
     }
-    speak(say, false, snd === 'win' ? 1300 : snd === 'run' || snd === 'change' ? 450 : 150);
+    speak(say, false, (snd === 'win' || (s.over && !wasOver)) ? 1300 : snd === 'run' || snd === 'change' ? 450 : 150);
   }
   function act(name) {
     if (s.over && name !== 'runMinus') return;
@@ -1238,8 +1246,19 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   });
   $('classList').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; picked.intra = b.dataset.c; renderPickers(); fillIntra(); });
   [0, 1].forEach(t => $('classList' + t).addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; picked.inter[t] = b.dataset.c; renderPickers(); fillInter(t); }));
-  $('practiceList').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; practiceWay = b.dataset.k; renderPickers(); [0, 1].forEach(t => picked.inter[t] && fillPractice(t)); });
-  $('splitWays').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; splitWay = b.dataset.k; renderPickers(); if (picked.intra) fillIntra(); });
+  $('practiceList').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return; practiceWay = b.dataset.k; renderPickers();
+    if (!picked.inter[0] && !picked.inter[1]) { $('interMsg') && ($('interMsg').textContent = ''); $('splitMsg').textContent = ''; }
+    [0, 1].forEach(t => picked.inter[t] && fillPractice(t));
+  });
+  $('splitWays').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return; splitWay = b.dataset.k;
+    const gs = groups();
+    if (!picked.intra && gs.length === 1) picked.intra = gs[0].name;
+    renderPickers();
+    if (picked.intra) { fillIntra(); $('splitMsg').textContent = `${picked.intra}을(를) ${splitWay === 'random' ? '무작위로' : '타율 참고로'} 새로 나눴어요.`; }
+    else $('splitMsg').textContent = gs.length ? '위에서 반을 먼저 골라 주세요.' : "'학급 명단 붙여넣기'에 명단을 먼저 넣어 주세요.";
+  });
   $('batPresets').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; draftBatters = +b.dataset.n; renderPickers(); renderBoard(); });
   [0, 1].forEach(i => $('n' + i).addEventListener('input', () => { renderBoard(); renderOrder(); }));
 
@@ -1463,6 +1482,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     draftColors = s.colors.slice();
     const known = groups().map(g => g.name).concat(Object.keys(gmeta));
     picked.inter = [0, 1].map(t => draftMode !== 'intra' && known.includes(s.names[t]) ? s.names[t] : '');
+    if (s.intraClass && groups().some(g => g.name === s.intraClass)) picked.intra = s.intraClass;
+    $('splitMsg').textContent = '';
     [0, 1].forEach(i => { $('n' + i).value = s.names[i]; setDraft(i, s.colors[i]); });
     $('rosterBox').open = false;
     renderPickers(); renderBoard(); renderOrder();
@@ -1490,7 +1511,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
     } catch (e) {}
     commit(() => {
       const before = JSON.stringify([s.lineup, s.sets, s.mode, s.batters]);
-      s.names = names; s.colors = colors; s.innings = inn; s.lineup = lineup; s.bench = bench; s.sets = sets; s.mode = mode; s.batters = batters;
+      s.names = names; s.colors = colors; s.innings = inn; s.intraClass = picked.intra || s.intraClass || ''; s.lineup = lineup; s.bench = bench; s.sets = sets; s.mode = mode; s.batters = batters;
       const changed = before !== JSON.stringify([s.lineup, s.sets, s.mode, s.batters]);
       if (changed) { s.bat = [0, 0]; s.done = []; s.halfDone = false; }
       s.last = `<b>설정 변경</b> · ${inn}이닝 · ${mode === 'inter' ? '반 대항 (1회 여자 · 2회 남자 · 3회 혼성)' : mode === 'practice' ? '반 대항 연습 (1회 여자 · 2회 남자 · 3회 혼성)' : '반 안 경기'}${changed ? ' · 타순을 1번부터 시작합니다' : ''}`;
